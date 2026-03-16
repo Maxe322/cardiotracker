@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 
 const MG = [
   { id:"chest", name:"Brust", color:"#E8553A" },
@@ -284,6 +284,255 @@ function generateWarmupSets(exerciseId, targetWeight) {
   return sets;
 }
 
+// ═══ EXERCISE ANALYTICS HELPERS ═══
+function getExerciseHistory(exerciseId, log) {
+  return log.filter(w => (w.exercises||[]).some(e => e.exerciseId === exerciseId)).map(w => {
+    const ex = w.exercises.find(e => e.exerciseId === exerciseId);
+    const work = ex.sets.filter(s => s.type !== "W");
+    const all = ex.sets;
+    const vol = work.reduce((a, s) => a + s.weight * s.reps, 0);
+    const totalReps = work.reduce((a, s) => a + s.reps, 0);
+    const maxW = work.length ? Math.max(...work.map(s => s.weight)) : 0;
+    const best1rm = work.length ? Math.max(...work.map(s => est1RM(s.weight, s.reps))) : 0;
+    const bestSet = work.reduce((b, s) => (s.weight * s.reps > b.weight * b.reps ? s : b), { weight: 0, reps: 0 });
+    return { date: w.date, sets: all, workSets: work, vol, totalReps, totalSets: work.length, maxW, best1rm, bestSet };
+  }).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getExerciseStats(exerciseId, log) {
+  const hist = getExerciseHistory(exerciseId, log);
+  if (!hist.length) return null;
+  const def = EX.find(e => e.id === exerciseId);
+  const mg = MG.find(m => m.id === def?.m);
+
+  const totalSessions = hist.length;
+  const totalSets = hist.reduce((a, h) => a + h.totalSets, 0);
+  const totalReps = hist.reduce((a, h) => a + h.totalReps, 0);
+  const totalVol = hist.reduce((a, h) => a + h.vol, 0);
+  const best1rm = Math.max(...hist.map(h => h.best1rm));
+  const maxWeight = Math.max(...hist.map(h => h.maxW));
+  const bestSessionVol = Math.max(...hist.map(h => h.vol));
+  const bestSet = hist.reduce((b, h) => (h.bestSet.weight * h.bestSet.reps > b.weight * b.reps ? h.bestSet : b), { weight: 0, reps: 0 });
+  const lastTrained = hist[hist.length - 1].date;
+  const firstLogged = hist[0].date;
+
+  const now = new Date();
+  const d14 = new Date(now); d14.setDate(d14.getDate() - 14);
+  const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+  const freq14 = hist.filter(h => new Date(h.date) >= d14).length;
+  const freq30 = hist.filter(h => new Date(h.date) >= d30).length;
+
+  const first1rm = hist[0].best1rm;
+  const last1rm = hist[hist.length - 1].best1rm;
+  const progressSinceFirst = best1rm > 0 && first1rm > 0 ? Math.round((last1rm - first1rm) * 10) / 10 : 0;
+
+  // Best 1RM in last 30 days
+  const recent30 = hist.filter(h => new Date(h.date) >= d30);
+  const best1rm30 = recent30.length ? Math.max(...recent30.map(h => h.best1rm)) : 0;
+
+  return {
+    def, mg, hist, totalSessions, totalSets, totalReps, totalVol,
+    best1rm, maxWeight, bestSessionVol, bestSet, lastTrained, firstLogged,
+    freq14, freq30, progressSinceFirst, best1rm30,
+    avgSetsPerSession: Math.round(totalSets / totalSessions * 10) / 10,
+    avgRepsPerSession: Math.round(totalReps / totalSessions),
+    avgVolPerSession: Math.round(totalVol / totalSessions),
+  };
+}
+
+function getExerciseTrend(hist) {
+  if (hist.length < 3) return "neutral";
+  const recent = hist.slice(-3);
+  const older = hist.slice(-6, -3);
+  if (!older.length) return "neutral";
+  const recentAvg = recent.reduce((a, h) => a + h.best1rm, 0) / recent.length;
+  const olderAvg = older.reduce((a, h) => a + h.best1rm, 0) / older.length;
+  const pct = (recentAvg - olderAvg) / Math.max(olderAvg, 1);
+  if (pct > 0.02) return "up";
+  if (pct < -0.02) return "down";
+  return "flat";
+}
+
+function getMilestones(hist, def) {
+  const ms = [];
+  if (!hist.length) return ms;
+  const thresholds = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200];
+  const maxW = Math.max(...hist.map(h => h.maxW));
+  for (const t of thresholds) {
+    if (maxW >= t) {
+      const first = hist.find(h => h.maxW >= t);
+      ms.push({ label: `${t} kg`, date: first?.date, reached: true });
+    } else {
+      ms.push({ label: `${t} kg`, date: null, reached: false });
+      break; // only show next unreached
+    }
+  }
+  return ms;
+}
+
+// ═══ EXERCISE DETAIL COMPONENT ═══
+function ExerciseDetail({ exerciseId, sLog, C, onClose }) {
+  const [chartType, setChartType] = useState("1rm");
+  const stats = useMemo(() => getExerciseStats(exerciseId, sLog), [exerciseId, sLog]);
+
+  if (!stats) return (
+    <div style={{padding:40,textAlign:"center",color:C.dim}}>
+      <div style={{fontSize:16,fontWeight:700,marginBottom:8}}>Keine Daten</div>
+      <button onClick={onClose} style={{padding:"10px 24px",background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>Zurück</button>
+    </div>
+  );
+
+  const { def, mg, hist, totalSessions, totalSets, totalReps, totalVol, best1rm, maxWeight, bestSessionVol, bestSet, lastTrained, firstLogged, freq14, freq30, progressSinceFirst, best1rm30, avgSetsPerSession, avgVolPerSession } = stats;
+  const trend = getExerciseTrend(hist);
+  const milestones = getMilestones(hist, def);
+  const trendColor = trend === "up" ? "#8BC34A" : trend === "down" ? "#E8553A" : "#D4A024";
+  const trendLabel = trend === "up" ? "Steigend" : trend === "down" ? "Fallend" : "Stabil";
+  const trendIcon = trend === "up" ? "\u2197" : trend === "down" ? "\u2198" : "\u2192";
+
+  const chartData = hist.map(h => ({
+    d: new Date(h.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }),
+    e1rm: Math.round(h.best1rm * 10) / 10,
+    maxW: h.maxW,
+    vol: Math.round(h.vol),
+    sets: h.totalSets,
+    reps: h.totalReps,
+  })).slice(-20);
+
+  const chartKey = { "1rm": { key: "e1rm", name: "Est. 1RM (kg)", color: C.ember }, "maxW": { key: "maxW", name: "Max Gewicht (kg)", color: C.sky }, "vol": { key: "vol", name: "Volumen (kg)", color: C.gold }, "sets": { key: "sets", name: "Sätze", color: C.violet } };
+  const cc = chartKey[chartType];
+
+  const sty = { card: { background: C.surface, borderRadius: 20, padding: "18px 14px", border: `1px solid ${C.border}`, marginBottom: 14 }, lbl: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12, paddingLeft: 4 } };
+  const ttCfg = { contentStyle: { background: C.elevated, border: `1px solid ${C.borderLight}`, borderRadius: 10, fontSize: 12, fontFamily: "'Outfit',sans-serif", color: C.text }, labelStyle: { color: C.muted } };
+
+  return (
+    <div style={{ animation: "fadeIn 0.3s ease" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+        <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 10, background: C.card, border: `1px solid ${C.border}`, color: C.muted, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Outfit'" }}>&larr;</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>{def?.name}</div>
+          <div style={{ fontSize: 13, color: mg?.color, fontWeight: 600 }}>{mg?.name}</div>
+        </div>
+        <div style={{ padding: "6px 14px", borderRadius: 10, background: `${trendColor}18`, border: `1px solid ${trendColor}30`, display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: 14 }}>{trendIcon}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: trendColor }}>{trendLabel}</span>
+        </div>
+      </div>
+
+      {/* Key stats grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+        {[
+          { v: `${Math.round(best1rm)}`, u: "kg", l: "Best 1RM", c: C.ember },
+          { v: `${maxWeight}`, u: "kg", l: "Max Gewicht", c: C.sky },
+          { v: `${totalSessions}`, u: "", l: "Sessions", c: C.gold },
+        ].map((s, i) => (
+          <div key={i} style={{ background: C.surface, borderRadius: 16, padding: "14px 8px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: s.c, letterSpacing: -1 }}>{s.v}<span style={{ fontSize: 11, color: C.muted }}>{s.u}</span></div>
+            <div style={{ fontSize: 9, color: C.muted, fontWeight: 700, letterSpacing: 1, marginTop: 2 }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+        {[
+          { v: `${Math.round(totalVol / 1000 * 10) / 10}t`, l: "Total Volumen", c: C.gold },
+          { v: `${totalSets}`, l: "Total Sätze", c: C.violet },
+          { v: `${bestSet.weight}x${bestSet.reps}`, l: "Bester Satz", c: C.ember },
+          { v: `${Math.round(bestSessionVol)}kg`, l: "Beste Session", c: C.sky },
+          { v: `${avgSetsPerSession}`, l: "\u00d8 Sätze/Session", c: C.muted },
+          { v: `${Math.round(avgVolPerSession)}kg`, l: "\u00d8 Vol/Session", c: C.muted },
+        ].map((s, i) => (
+          <div key={i} style={{ background: C.card, borderRadius: 12, padding: "10px 12px", border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: s.c }}>{s.v}</div>
+            <div style={{ fontSize: 10, color: C.dim, fontWeight: 600 }}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Insights */}
+      <div style={sty.card}>
+        <div style={sty.lbl}>INSIGHTS</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {progressSinceFirst !== 0 && (
+            <div style={{ fontSize: 13, color: progressSinceFirst > 0 ? C.lime : C.ember, fontWeight: 600 }}>
+              {progressSinceFirst > 0 ? "\u2197" : "\u2198"} {progressSinceFirst > 0 ? "+" : ""}{progressSinceFirst} kg 1RM seit erstem Log
+            </div>
+          )}
+          {best1rm30 > 0 && <div style={{ fontSize: 13, color: C.sub }}>Best 1RM (30 Tage): <span style={{ fontWeight: 700, color: C.ember }}>{Math.round(best1rm30)} kg</span></div>}
+          <div style={{ fontSize: 13, color: C.sub }}>Letztes Training: <span style={{ fontWeight: 700 }}>{new Date(lastTrained).toLocaleDateString("de-DE", { day: "2-digit", month: "short" })}</span></div>
+          <div style={{ fontSize: 13, color: C.sub }}>Häufigkeit: <span style={{ fontWeight: 700 }}>{freq14}x in 14 Tagen</span> &middot; <span style={{ fontWeight: 700 }}>{freq30}x in 30 Tagen</span></div>
+          {firstLogged !== lastTrained && <div style={{ fontSize: 13, color: C.dim }}>Erstes Log: {new Date(firstLogged).toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "2-digit" })}</div>}
+        </div>
+      </div>
+
+      {/* Chart selector */}
+      <div style={sty.card}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+          {[["1rm", "1RM"], ["maxW", "Max KG"], ["vol", "Volumen"], ["sets", "Sätze"]].map(([k, l]) => (
+            <button key={k} onClick={() => setChartType(k)} style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: chartType === k ? `1.5px solid ${chartKey[k].color}` : `1px solid ${C.border}`, background: chartType === k ? `${chartKey[k].color}14` : C.card, color: chartType === k ? chartKey[k].color : C.dim, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit',sans-serif" }}>{l}</button>
+          ))}
+        </div>
+        {chartData.length > 1 ? (
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={chartData}>
+              <defs><linearGradient id={`g_${chartType}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={cc.color} stopOpacity={0.25} /><stop offset="100%" stopColor={cc.color} stopOpacity={0} /></linearGradient></defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+              <XAxis dataKey="d" tick={{ fontSize: 9, fill: C.dim }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: C.dim }} axisLine={false} tickLine={false} />
+              <Tooltip {...ttCfg} />
+              <Area type="monotone" dataKey={cc.key} stroke={cc.color} fill={`url(#g_${chartType})`} strokeWidth={2.5} name={cc.name} dot={{ r: 3, fill: cc.color }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: C.dim, fontSize: 13 }}>Mehr Daten nötig</div>}
+      </div>
+
+      {/* Milestones */}
+      {milestones.length > 0 && !def?.bw && (
+        <div style={sty.card}>
+          <div style={sty.lbl}>MEILENSTEINE</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {milestones.map((m, i) => (
+              <div key={i} style={{
+                padding: "6px 14px", borderRadius: 10,
+                background: m.reached ? `${C.gold}14` : C.card,
+                border: `1px solid ${m.reached ? `${C.gold}40` : C.border}`,
+                opacity: m.reached ? 1 : 0.4,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: m.reached ? C.gold : C.dim }}>{m.label}</div>
+                {m.reached && m.date && <div style={{ fontSize: 9, color: C.muted }}>{new Date(m.date).toLocaleDateString("de-DE", { month: "short", year: "2-digit" })}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent sessions */}
+      <div style={sty.card}>
+        <div style={sty.lbl}>LETZTE SESSIONS</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {hist.slice(-8).reverse().map((h, i) => (
+            <div key={i} style={{ background: C.card, borderRadius: 12, padding: "10px 14px", border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{new Date(h.date).toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "2-digit" })}</span>
+                <span style={{ fontSize: 11, color: C.muted }}>{h.totalSets} Sätze &middot; {Math.round(h.vol)}kg</span>
+              </div>
+              <div style={{ fontSize: 12, color: C.sub }}>
+                {h.workSets.map(s => `${s.weight}x${s.reps}${s.type && s.type !== "N" ? `(${s.type})` : ""}`).join(", ")}
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 4, fontSize: 10, color: C.dim }}>
+                <span>Best: {h.bestSet.weight}x{h.bestSet.reps}</span>
+                <span>1RM: {Math.round(h.best1rm)}kg</span>
+                <span>Max: {h.maxW}kg</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ RECOVERY MODEL ═══
 function muscleRec(muscle, log) {
   const now = Date.now(); let lastTime = 0; let lastVolume = 0;
   for (const w of log) for (const ex of (w.exercises||[])) {
@@ -310,6 +559,7 @@ const COMPOUND_IDS = ["bench_bb","bench_db","incline_bb","incline_db","decline_b
 
 export default function StrengthTab({ C, data, update, onBack }) {
   const [sub, setSub] = useState("log");
+  const [detailEx, setDetailEx] = useState(null); // exercise detail view
   const [active, setActive] = useState(null);
   const [picker, setPicker] = useState(false);
   const [exFilter, setExFilter] = useState("all");
@@ -709,7 +959,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
             return (
               <div key={ei} style={{background:C.surface,borderRadius:18,padding:"16px 16px 12px",border:`1px solid ${C.border}`,marginBottom:10,borderLeft:`4px solid ${mg?.color||C.muted}`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                  <div><div style={{fontSize:16,fontWeight:800}}>{def?.name||"?"}</div><div style={{fontSize:11,color:mg?.color,fontWeight:600}}>{mg?.name}</div></div>
+                  <div onClick={()=>{setSub("history");setDetailEx(ex.exerciseId)}} style={{cursor:"pointer"}}><div style={{fontSize:16,fontWeight:800}}>{def?.name||"?"}</div><div style={{fontSize:11,color:mg?.color,fontWeight:600}}>{mg?.name}</div></div>
                   <button onClick={()=>rmEx(ei)} style={{width:30,height:30,borderRadius:8,background:C.card,border:`1px solid ${C.border}`,color:C.muted,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
                 </div>
                 {sug && <div style={{background:C.goldBg,borderRadius:10,padding:"8px 12px",marginBottom:8,border:`1px solid ${C.gold}20`,fontSize:12,color:C.gold,fontWeight:600}}>{sug.reason}</div>}
@@ -837,30 +1087,59 @@ export default function StrengthTab({ C, data, update, onBack }) {
       {/* ═══ HISTORY ═══ */}
       {sub==="history" && (
         <div>
-          {sLog.length===0?(<div style={{textAlign:"center",padding:"60px 20px",color:C.dim,fontSize:14}}>Noch keine Kraft-Workouts</div>):(
+          {/* Exercise Detail View */}
+          {detailEx ? (
+            <ExerciseDetail exerciseId={detailEx} sLog={sLog} C={C} onClose={()=>setDetailEx(null)} />
+          ) : sLog.length===0 ? (
+            <div style={{textAlign:"center",padding:"60px 20px",color:C.dim,fontSize:14}}>Noch keine Kraft-Workouts</div>
+          ) : (
             <>
+              {/* Exercise selector with tap-to-detail */}
               <div style={sty.card}>
                 <div style={sty.lbl}>ÜBUNGSFORTSCHRITT</div>
-                <select value={histEx||""} onChange={e=>setHistEx(e.target.value||null)} style={{...inp,textAlign:"left",marginBottom:12}}>
-                  <option value="">Übung wählen...</option>
-                  {[...new Set(sLog.flatMap(w=>(w.exercises||[]).map(e=>e.exerciseId)))].map(id=>{const def=EX.find(e=>e.id===id);return<option key={id} value={id}>{def?.name||id}</option>;})}
-                </select>
-                {histEx&&(()=>{
-                  const entries=sLog.filter(w=>(w.exercises||[]).some(e=>e.exerciseId===histEx)).map(w=>{
-                    const ex=w.exercises.find(e=>e.exerciseId===histEx);
-                    const e1=Math.max(...ex.sets.filter(s=>s.type!=="W").map(s=>est1RM(s.weight,s.reps)));
-                    return{d:new Date(w.date).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"}),e1rm:Math.round(e1)};
-                  }).reverse().slice(-12);
-                  return entries.length>0?(<ResponsiveContainer width="100%" height={140}><BarChart data={entries}><CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false}/><XAxis dataKey="d" tick={{fontSize:9,fill:C.dim}} axisLine={false} tickLine={false}/><YAxis tick={{fontSize:9,fill:C.dim}} axisLine={false} tickLine={false}/><Tooltip contentStyle={{background:C.elevated,border:`1px solid ${C.borderLight}`,borderRadius:10,fontSize:12,color:C.text}} labelStyle={{color:C.muted}}/><Bar dataKey="e1rm" name="Est. 1RM (kg)" radius={[5,5,0,0]} fill={C.ember}/></BarChart></ResponsiveContainer>):null;
-                })()}
+                <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
+                  {[...new Set(sLog.flatMap(w=>(w.exercises||[]).map(e=>e.exerciseId)))].map(id => {
+                    const def = EX.find(e=>e.id===id);
+                    const mg = MG.find(m=>m.id===def?.m);
+                    const sessions = sLog.filter(w=>(w.exercises||[]).some(e=>e.exerciseId===id)).length;
+                    const allSets = sLog.flatMap(w=>(w.exercises||[]).filter(e=>e.exerciseId===id).flatMap(e=>e.sets.filter(s=>s.type!=="W")));
+                    const best = allSets.length ? Math.round(Math.max(...allSets.map(s=>est1RM(s.weight,s.reps)))) : 0;
+                    return (
+                      <div key={id} onClick={()=>setDetailEx(id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:12,background:C.card,border:`1px solid ${C.border}`,cursor:"pointer"}}>
+                        <div style={{width:6,height:32,borderRadius:3,background:mg?.color||C.dim,flexShrink:0}}/>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:14,fontWeight:700}}>{def?.name||id}</div>
+                          <div style={{fontSize:11,color:C.muted}}>{sessions}x trainiert</div>
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          {best > 0 && <div style={{fontSize:15,fontWeight:800,color:mg?.color||C.ember}}>{best}<span style={{fontSize:10,color:C.dim}}> 1RM</span></div>}
+                        </div>
+                        <div style={{color:C.dim,fontSize:14}}>&rsaquo;</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Recent workouts */}
+              <div style={sty.lbl}>LETZTE WORKOUTS</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                {sLog.map((w,i)=>(<div key={w.id||i} style={{background:C.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.border}`}}>
+                {sLog.slice(0, 15).map((w,i)=>(<div key={w.id||i} style={{background:C.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.border}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
                     <div style={{fontSize:15,fontWeight:700}}>{new Date(w.date).toLocaleDateString("de-DE",{day:"2-digit",month:"short",year:"2-digit"})}</div>
                     <div style={{fontSize:12,color:C.muted}}>{w.duration||"?"} min &middot; {(w.exercises||[]).length} Üb.</div>
                   </div>
-                  {(w.exercises||[]).map((ex,ei)=>{const def=EX.find(e=>e.id===ex.exerciseId);const vol=ex.sets.filter(s=>s.type!=="W").reduce((s,set)=>s+set.weight*set.reps,0);return(<div key={ei} style={{fontSize:12,color:C.sub,marginBottom:2}}><span style={{fontWeight:600}}>{def?.name||ex.exerciseId}</span><span style={{color:C.muted}}> — {ex.sets.map(s=>`${s.weight}x${s.reps}${s.type&&s.type!=="N"?`(${s.type})`:""}${s.rpe?`@${s.rpe}`:""}`).join(", ")}</span><span style={{color:C.dim}}> ({Math.round(vol)}kg)</span></div>);})}
+                  {(w.exercises||[]).map((ex,ei)=>{
+                    const def=EX.find(e=>e.id===ex.exerciseId);
+                    const vol=ex.sets.filter(s=>s.type!=="W").reduce((s,set)=>s+set.weight*set.reps,0);
+                    return (
+                      <div key={ei} onClick={()=>setDetailEx(ex.exerciseId)} style={{fontSize:12,color:C.sub,marginBottom:2,cursor:"pointer",padding:"2px 0"}}>
+                        <span style={{fontWeight:600}}>{def?.name||ex.exerciseId}</span>
+                        <span style={{color:C.muted}}> — {ex.sets.filter(s=>s.type!=="W").map(s=>`${s.weight}x${s.reps}`).join(", ")}</span>
+                        <span style={{color:C.dim}}> ({Math.round(vol)}kg)</span>
+                      </div>
+                    );
+                  })}
                 </div>))}
               </div>
             </>
