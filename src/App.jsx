@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, AreaChart, Area, LineChart, Line
 } from "recharts";
-import StrengthTab from "./Strength";
+import StrengthSection from "./Strength";
 
 const C = {
   bg: "#0A0A08", surface: "#141412", card: "#1C1C19", elevated: "#242420",
@@ -127,7 +127,8 @@ function TI({type,size=36}){
 }
 
 export default function App(){
-  const [data, setData] = useState({ workouts:[], startDate:null, strengthLog:[], strengthTemplates:[] });
+  const [data, setData] = useState({ workouts:[], startDate:null, strengthLog:[], strengthTemplates:[], trainingDays:[] });
+  const [mode, setMode] = useState(null); // null=selector, "cardio", "strength"
   const [view, setView] = useState("dash");
   const [modal, setModal] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -325,31 +326,71 @@ export default function App(){
 
   const inp={width:"100%",padding:"13px 16px",background:C.card,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:15,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box"};
   const sty = { card: {background:C.surface,borderRadius:20,padding:"18px 14px",border:`1px solid ${C.border}`,marginBottom:14}, label: {fontSize:11,fontWeight:700,color:C.muted,letterSpacing:2,textTransform:"uppercase",marginBottom:14,paddingLeft:4} };
+  const globalStyles = `@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes pop{0%{transform:scale(.95);opacity:0}100%{transform:scale(1);opacity:1}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes glow{0%,100%{box-shadow:0 0 8px ${C.gold}44}50%{box-shadow:0 0 24px ${C.gold}88}}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}input[type=range]{accent-color:${C.ember}}::-webkit-scrollbar{width:0;height:0}`;
 
+  // ═══ STRENGTH MODE — Full takeover ═══
+  if (mode === "strength") {
+    return (
+      <div style={{fontFamily:"'Outfit',sans-serif"}}>
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+        <style>{globalStyles}</style>
+        <StrengthSection C={C} data={data} update={update} onBack={()=>setMode(null)} />
+      </div>
+    );
+  }
+
+  // ═══ MODE SELECTOR ═══
+  if (mode === null) {
+    return (
+      <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"40px 24px"}}>
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+        <style>{globalStyles}</style>
+        <div style={{fontSize:13,fontWeight:600,color:C.ember,letterSpacing:3,textTransform:"uppercase",marginBottom:8,animation:"fadeIn 0.4s ease"}}>FITNESS TRACKER</div>
+        <div style={{fontSize:34,fontWeight:900,letterSpacing:-1.5,marginBottom:6,animation:"fadeUp 0.5s ease"}}>Was trainierst du?</div>
+        <div style={{fontSize:14,color:C.muted,marginBottom:40,animation:"fadeUp 0.5s ease 0.1s both"}}>Wähle deinen Trainingsbereich</div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:14,width:"100%",maxWidth:360}}>
+          <button onClick={()=>setMode("cardio")} style={{
+            background:`linear-gradient(135deg, ${C.emberBg}, ${C.surface})`,border:`1.5px solid ${C.ember}30`,
+            borderRadius:22,padding:"28px 24px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+            animation:"fadeUp 0.4s ease 0.15s both",transition:"transform 0.15s",
+          }}>
+            <div style={{fontSize:13,fontWeight:800,color:C.ember,letterSpacing:2,marginBottom:4}}>CARDIO</div>
+            <div style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:6}}>Ausdauertraining</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.4}}>10-Wochen Laufplan, Zone 2, Intervalle, Workouts tracken</div>
+          </button>
+
+          <button onClick={()=>setMode("strength")} style={{
+            background:`linear-gradient(135deg, ${C.skyBg}, ${C.surface})`,border:`1.5px solid ${C.sky}30`,
+            borderRadius:22,padding:"28px 24px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+            animation:"fadeUp 0.4s ease 0.25s both",transition:"transform 0.15s",
+          }}>
+            <div style={{fontSize:13,fontWeight:800,color:C.sky,letterSpacing:2,marginBottom:4}}>KRAFT</div>
+            <div style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:6}}>Krafttraining</div>
+            <div style={{fontSize:13,color:C.muted,lineHeight:1.4}}>Übungen loggen, Progressive Overload, Split-Tage, Recovery</div>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ═══ CARDIO MODE ═══
   return(
     <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:"'Outfit',sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
-      <style>{`
-        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-        @keyframes pop{0%{transform:scale(.95);opacity:0}100%{transform:scale(1);opacity:1}}
-        @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-        @keyframes glow{0%,100%{box-shadow:0 0 8px ${C.gold}44}50%{box-shadow:0 0 24px ${C.gold}88}}
-        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-        input[type=range]{accent-color:${C.ember}}::-webkit-scrollbar{width:0;height:0}
-      `}</style>
+      <style>{globalStyles}</style>
 
       {/* HEADER */}
       <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,8,0.88)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)"}}>
         <div style={{padding:"16px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
-            <div style={{fontSize:13,fontWeight:600,color:C.ember,letterSpacing:2.5,textTransform:"uppercase",marginBottom:2}}>CARDIO TRACKER</div>
-            <div style={{fontSize:26,fontWeight:800,letterSpacing:-1}}>10-Wochen-Plan</div>
+            <button onClick={()=>setMode(null)} style={{fontSize:13,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",fontWeight:600,padding:0,marginBottom:2,letterSpacing:1}}>&larr; ZURÜCK</button>
+            <div style={{fontSize:26,fontWeight:800,letterSpacing:-1}}>Cardio</div>
           </div>
           <button onClick={()=>{closeModal();setModal(true)}} style={{width:44,height:44,borderRadius:14,background:C.ember,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,color:"#fff",fontWeight:300,lineHeight:1,boxShadow:`0 4px 20px ${C.ember}44`}}>+</button>
         </div>
         <div style={{display:"flex",gap:0,padding:"14px 20px 0"}}>
-          {[["dash","Übersicht"],["plan","Programm"],["strength","Kraft"],["history","Verlauf"],["badges","Erfolge"]].map(([k,l])=>(
+          {[["dash","Übersicht"],["plan","Programm"],["history","Verlauf"],["badges","Erfolge"]].map(([k,l])=>(
             <button key={k} onClick={()=>setView(k)} style={{padding:"8px 14px 12px",background:"transparent",border:"none",borderBottom:view===k?`2.5px solid ${C.ember}`:"2.5px solid transparent",color:view===k?C.text:C.muted,fontSize:13,fontWeight:view===k?700:400,cursor:"pointer",fontFamily:"inherit",transition:"all 0.2s"}}>{l}</button>
           ))}
         </div>
@@ -687,11 +728,6 @@ export default function App(){
               </div>
             </>)}
           </div>
-        )}
-
-        {/* ═══ STRENGTH ═══ */}
-        {view==="strength"&&(
-          <StrengthTab C={C} data={data} update={update} />
         )}
 
         {/* ═══ BADGES / ERFOLGE ═══ */}
