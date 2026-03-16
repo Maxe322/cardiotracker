@@ -603,6 +603,8 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const [showTmpl, setShowTmpl] = useState(false);
   const [showSplits, setShowSplits] = useState(false);
   const [summary, setSummary] = useState(null); // workout summary after finish
+  const [aiWorkout, setAiWorkout] = useState(null); // AI-generated workout preview
+  const [aiLoading, setAiLoading] = useState(false);
   const timerRef = useRef(null);
 
   // ═══ PERSIST ACTIVE WORKOUT ═══
@@ -709,6 +711,97 @@ export default function StrengthTab({ C, data, update, onBack }) {
 
   const startFromDay = (day) => {
     startWorkout({ exercises: day.exercises.map(eid => ({ exerciseId: eid })) });
+    setSub("log");
+  };
+
+  // ═══ AI WORKOUT GENERATOR ═══
+  const generateAiWorkout = async () => {
+    setAiLoading(true);
+    setAiWorkout(null);
+    try {
+      // Build context for Claude
+      const recoveryInfo = MG.map(m => `${m.name}: ${recMap[m.id] ?? 100}%`).join(", ");
+
+      // Last 5 workouts summary
+      const recentWorkouts = sLog.slice(0, 5).map(w => {
+        const muscles = [...new Set((w.exercises || []).map(e => EX.find(x => x.id === e.exerciseId)?.m).filter(Boolean))];
+        const mgNames = muscles.map(mid => MG.find(m => m.id === mid)?.name || mid);
+        return `${w.date}: ${mgNames.join(", ")} (${w.exercises?.length || 0} Übungen, ${w.duration || "?"}min)`;
+      }).join("\n");
+
+      // Available exercises (filtered by equipment)
+      const exList = availableEx.map(e => {
+        const mg = MG.find(m => m.id === e.m);
+        return `${e.id} | ${e.name} | ${mg?.name || e.m}`;
+      }).join("\n");
+
+      // Training days pattern
+      const splitInfo = trainingDays.length > 0
+        ? trainingDays.map(d => `${d.name}: ${d.exercises.map(eid => EX.find(e => e.id === eid)?.name || eid).join(", ")}`).join("\n")
+        : "Kein fester Split definiert.";
+
+      const prompt = `Du bist ein Krafttraining-Coach. Generiere ein optimales Workout für heute.
+
+RECOVERY-STATUS (100% = voll erholt, 0% = erschöpft):
+${recoveryInfo}
+
+LETZTE WORKOUTS:
+${recentWorkouts || "Keine bisherigen Workouts."}
+
+MEIN SPLIT-MUSTER:
+${splitInfo}
+
+REGELN:
+- Wähle Muskeln die gut erholt sind (>60%). Vermeide Muskeln <40%.
+- Trainiere NICHT dieselben Muskelgruppen wie im letzten Workout.
+- Wähle 5-7 Übungen die zusammenpassen (z.B. Push-Tag, Pull-Tag, Beine-Tag, etc.).
+- Nutze NUR exercise IDs aus der folgenden Liste.
+- Gib dem Workout einen kurzen deutschen Namen (z.B. "Push Day", "Rücken & Bizeps", "Beine & Core").
+
+VERFÜGBARE ÜBUNGEN:
+${exList}
+
+Antworte NUR mit einem JSON-Objekt, kein anderer Text:
+{"name": "Workout-Name", "exercises": ["exercise_id_1", "exercise_id_2", ...], "reason": "Kurze Begründung auf Deutsch warum diese Auswahl"}`;
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+
+      const data = await response.json();
+      const text = data.content?.[0]?.text || "";
+
+      // Parse JSON from response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Keine gültige Antwort");
+
+      const result = JSON.parse(jsonMatch[0]);
+      const validExercises = (result.exercises || []).filter(eid => EX.some(e => e.id === eid));
+
+      if (!validExercises.length) throw new Error("Keine gültigen Übungen generiert");
+
+      setAiWorkout({
+        name: result.name || "AI Workout",
+        exercises: validExercises,
+        reason: result.reason || "",
+      });
+    } catch (err) {
+      alert("AI Workout fehlgeschlagen: " + err.message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const startAiWorkout = () => {
+    if (!aiWorkout) return;
+    startWorkout({ exercises: aiWorkout.exercises.map(eid => ({ exerciseId: eid })) });
+    setAiWorkout(null);
     setSub("log");
   };
 
@@ -1080,6 +1173,61 @@ export default function StrengthTab({ C, data, update, onBack }) {
       {/* ═══ WORKOUT LOG ═══ */}
       {sub==="log" && !active && (
         <div>
+          {/* AI Workout Generator */}
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          <div style={{marginBottom:18}}>
+            <button onClick={generateAiWorkout} disabled={aiLoading} style={{
+              width:"100%",padding:"18px 20px",borderRadius:16,border:`1px solid rgba(139,164,184,0.25)`,
+              background:"linear-gradient(135deg, rgba(139,164,184,0.08), rgba(155,143,184,0.06))",
+              cursor:aiLoading?"wait":"pointer",fontFamily:"inherit",textAlign:"left",
+              display:"flex",alignItems:"center",gap:14,transition:"all 0.2s",
+              opacity:aiLoading?0.7:1,
+            }}>
+              <div style={{width:42,height:42,borderRadius:12,background:"linear-gradient(135deg, rgba(139,164,184,0.15), rgba(155,143,184,0.12))",border:`1px solid rgba(139,164,184,0.2)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                {aiLoading ? <div style={{width:16,height:16,border:`2px solid ${C.sky}`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite"}}/> : "✦"}
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:800,color:C.text,letterSpacing:0.5}}>{aiLoading ? "Generiere..." : "AI Workout"}</div>
+                <div style={{fontSize:10,color:C.muted,marginTop:1}}>Optimales Training basierend auf Recovery & Split</div>
+              </div>
+            </button>
+          </div>
+
+          {/* AI Workout Preview */}
+          {aiWorkout && (
+            <div style={{background:C.surface,borderRadius:18,padding:"18px 18px 14px",border:`1px solid rgba(139,164,184,0.2)`,marginBottom:18}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,color:C.sky,letterSpacing:2.5,textTransform:"uppercase",marginBottom:4}}>AI VORSCHLAG</div>
+                  <div style={{fontSize:18,fontWeight:800,color:C.text}}>{aiWorkout.name}</div>
+                </div>
+                <button onClick={()=>setAiWorkout(null)} style={{width:28,height:28,borderRadius:8,background:C.card,border:`1px solid ${C.border}`,color:C.dim,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
+              </div>
+              {aiWorkout.reason && <div style={{fontSize:11,color:C.muted,marginBottom:14,lineHeight:1.5,padding:"8px 12px",background:C.card,borderRadius:10,border:`1px solid ${C.border}`}}>{aiWorkout.reason}</div>}
+              <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:14}}>
+                {aiWorkout.exercises.map((eid, i) => {
+                  const def = EX.find(e => e.id === eid);
+                  const mg = MG.find(m => m.id === def?.m);
+                  const prev = getPrev(eid);
+                  return (
+                    <div key={eid} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderRadius:10,background:C.card,border:`1px solid ${C.border}`}}>
+                      <div style={{width:22,height:22,borderRadius:6,background:`${mg?.color || C.dim}18`,border:`1px solid ${mg?.color || C.dim}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:mg?.color || C.dim,flexShrink:0}}>{i+1}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:700,color:C.text}}>{def?.name || eid}</div>
+                        <div style={{fontSize:10,color:mg?.color || C.dim,fontWeight:600}}>{mg?.name}</div>
+                      </div>
+                      {prev && <div style={{fontSize:10,color:C.dim,textAlign:"right",flexShrink:0}}>{prev.sets[0]?.weight}kg × {prev.sets[0]?.reps}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={startAiWorkout} style={{flex:1,padding:"14px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:12,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase"}}>Starten</button>
+                <button onClick={generateAiWorkout} disabled={aiLoading} style={{padding:"14px 18px",background:C.card,color:C.sub,border:`1px solid ${C.border}`,borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>↻ Neu</button>
+              </div>
+            </div>
+          )}
+
           {trainingDays.length > 0 && (
             <div style={{marginBottom:18}}>
               <div style={{fontSize:13,fontWeight:700,color:C.sub,marginBottom:10}}>Trainingstage</div>
