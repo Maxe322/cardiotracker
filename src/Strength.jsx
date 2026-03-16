@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import MuscleRecoveryPanel from "./MuscleBody";
 
 const MG = [
   { id:"chest", name:"Brust", color:"#c4956a" },
@@ -1255,25 +1256,19 @@ export default function StrengthTab({ C, data, update, onBack }) {
       {/* ═══ MUSCLES ═══ */}
       {sub==="muscles" && (
         <div>
-          {/* Statue hero */}
-          <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",padding:"24px 0 10px"}}>
-            <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:280,height:320,background:"radial-gradient(ellipse, rgba(196,149,106,0.06) 0%, transparent 70%)",filter:"blur(40px)",animation:"glow 6s ease-in-out infinite"}}/>
-            <div style={{position:"absolute",top:"20%",left:"50%",transform:"translateX(-50%)",width:180,height:220,opacity:0.05,backgroundImage:`linear-gradient(rgba(196,149,106,0.5) 1px, transparent 1px),linear-gradient(90deg, rgba(196,149,106,0.5) 1px, transparent 1px)`,backgroundSize:"18px 18px",borderRadius:16}}/>
+          {/* Premium Recovery Panel */}
+          <div style={{padding:"14px 0 0"}}>
             <div style={sty.lbl}>MUSKEL-RECOVERY</div>
-            <div style={{width:140,height:180,borderRadius:16,overflow:"hidden",position:"relative",boxShadow:"0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(196,149,106,0.04)"}}>
-              <img src="https://images.unsplash.com/photo-1618403088890-3d9ff6f4c8b4?w=400&q=80" alt="" style={{width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(0.3) contrast(1.1) brightness(0.95)"}} onError={e=>{e.target.style.display="none"}}/>
-              <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg, rgba(196,149,106,0.08) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.4) 100%)",borderRadius:16}}/>
-              <div style={{position:"absolute",inset:0,border:`1px solid rgba(255,255,255,0.08)`,borderRadius:16}}/>
-            </div>
+            <MuscleRecoveryPanel C={C} recMap={recMap} />
           </div>
 
-          {/* Recovery cards */}
-          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
-            {MG.map(m=>{const r=recMap[m.id]||0;const col=r>=80?C.lime:r>=50?C.gold:C.ember;
-              return(<div key={m.id} style={{background:C.surface,borderRadius:16,padding:"14px 18px",border:`1px solid ${C.border}`,backdropFilter:"blur(20px)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                  <span style={{fontSize:11,fontWeight:700,letterSpacing:2.5,textTransform:"uppercase"}}>{m.name}</span>
-                  <span style={{fontSize:14,fontWeight:700,color:col,fontVariantNumeric:"tabular-nums"}}>{r}%</span>
+          {/* Recovery bars — detail view */}
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:16}}>
+            {MG.map(m=>{const r=recMap[m.id]||0;const col=r>=80?"#5db86a":r>=50?"#d4a24e":"#c9524a";
+              return(<div key={m.id} style={{background:C.surface,borderRadius:14,padding:"12px 16px",border:`1px solid ${C.border}`,backdropFilter:"blur(20px)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <span style={{fontSize:10,fontWeight:700,letterSpacing:2.5,textTransform:"uppercase"}}>{m.name}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:col,fontVariantNumeric:"tabular-nums"}}>{r}%</span>
                 </div>
                 <div style={{height:3,background:"rgba(255,255,255,0.04)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${r}%`,background:`linear-gradient(90deg, ${col}88, ${col})`,borderRadius:2,transition:"width 1s ease",boxShadow:`0 0 8px ${col}33`}}/></div>
               </div>);
