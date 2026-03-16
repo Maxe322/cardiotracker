@@ -295,7 +295,7 @@ function getExerciseHistory(exerciseId, log) {
     const maxW = work.length ? Math.max(...work.map(s => s.weight)) : 0;
     const best1rm = work.length ? Math.max(...work.map(s => est1RM(s.weight, s.reps))) : 0;
     const bestSet = work.reduce((b, s) => (s.weight * s.reps > b.weight * b.reps ? s : b), { weight: 0, reps: 0 });
-    return { date: w.date, sets: all, workSets: work, vol, totalReps, totalSets: work.length, maxW, best1rm, bestSet };
+    return { date: w.date, sets: all, workSets: work, vol, totalReps, totalSets: work.length, maxW, best1rm, bestSet, sessionNote: ex.sessionNote || "" };
   }).sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -371,7 +371,7 @@ function getMilestones(hist, def) {
 }
 
 // ═══ EXERCISE DETAIL COMPONENT ═══
-function ExerciseDetail({ exerciseId, sLog, C, onClose }) {
+function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNote }) {
   const [chartType, setChartType] = useState("1rm");
   const stats = useMemo(() => getExerciseStats(exerciseId, sLog), [exerciseId, sLog]);
 
@@ -418,6 +418,24 @@ function ExerciseDetail({ exerciseId, sLog, C, onClose }) {
           <span style={{ fontSize: 12, fontWeight: 700, color: trendColor }}>{trendLabel}</span>
         </div>
       </div>
+
+      {/* Persistent notes */}
+      {(()=>{
+        const note = exerciseNotes?.[exerciseId];
+        return (
+          <div style={{background:`${C.sky}0a`,borderRadius:16,padding:note?"14px 16px":"10px 16px",border:`1px solid ${C.sky}18`,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,cursor:"pointer"}} onClick={()=>onEditNote?.(exerciseId)}>
+            {note ? (
+              <div style={{flex:1}}>
+                <div style={{fontSize:10,fontWeight:700,color:C.sky,letterSpacing:1.5,marginBottom:4}}>CUES</div>
+                <div style={{fontSize:13,color:C.sub,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{note}</div>
+              </div>
+            ) : (
+              <div style={{fontSize:12,color:C.dim}}>Cues hinzufügen...</div>
+            )}
+            <div style={{fontSize:12,color:C.dim,flexShrink:0,marginTop:note?0:0}}>&#9998;</div>
+          </div>
+        );
+      })()}
 
       {/* Key stats grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
@@ -524,6 +542,7 @@ function ExerciseDetail({ exerciseId, sLog, C, onClose }) {
                 <span>1RM: {Math.round(h.best1rm)}kg</span>
                 <span>Max: {h.maxW}kg</span>
               </div>
+              {h.sessionNote && <div style={{ fontSize: 11, color: C.sky, fontStyle: "italic", marginTop: 4 }}>{h.sessionNote}</div>}
             </div>
           ))}
         </div>
@@ -578,17 +597,34 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const sLog = data.strengthLog || [];
   const templates = data.strengthTemplates || [];
   const trainingDays = data.trainingDays || [];
-  const userEquipment = data.userEquipment || EQUIPMENT.map(e => e.id); // default: all
+  const userEquipment = data.userEquipment || EQUIPMENT.map(e => e.id);
+  const exerciseNotes = data.exerciseNotes || {}; // { [exerciseId]: "note text" }
   const [showEqSettings, setShowEqSettings] = useState(false);
+  const [editingNoteFor, setEditingNoteFor] = useState(null); // exerciseId being edited
+  const [noteText, setNoteText] = useState("");
 
-  const save = useCallback((log, tmpls, days, eq) => {
+  const save = useCallback((log, tmpls, days, eq, notes) => {
     update(prev => ({
       ...(log !== undefined ? { strengthLog: log } : {}),
       ...(tmpls !== undefined ? { strengthTemplates: tmpls } : {}),
       ...(days !== undefined ? { trainingDays: days } : {}),
       ...(eq !== undefined ? { userEquipment: eq } : {}),
+      ...(notes !== undefined ? { exerciseNotes: notes } : {}),
     }));
   }, [update]);
+
+  // ═══ NOTE HELPERS ═══
+  const getExNote = (eid) => exerciseNotes[eid] || "";
+  const setExNote = (eid, text) => {
+    const next = { ...exerciseNotes, [eid]: text.trim() };
+    if (!text.trim()) delete next[eid];
+    save(undefined, undefined, undefined, undefined, next);
+  };
+  const openNoteEditor = (eid) => { setNoteText(getExNote(eid)); setEditingNoteFor(eid); };
+  const saveNoteEditor = () => { if (editingNoteFor) setExNote(editingNoteFor, noteText); setEditingNoteFor(null); };
+  const updateSessionNote = (ei, text) => setActive(p => ({
+    ...p, exercises: p.exercises.map((e, i) => i !== ei ? e : { ...e, sessionNote: text })
+  }));
 
   const toggleEquipment = (eqId) => {
     const next = userEquipment.includes(eqId) ? userEquipment.filter(e => e !== eqId) : [...userEquipment, eqId];
@@ -703,6 +739,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
       exercises: active.exercises.map(e => ({
         exerciseId: e.exerciseId,
         sets: e.sets.filter(s => s.done).map(s => ({ weight: s.weight, reps: s.reps, type: s.type || "N", rpe: s.rpe || 0 })),
+        ...(e.sessionNote?.trim() ? { sessionNote: e.sessionNote.trim() } : {}),
       })).filter(e => e.sets.length > 0),
     };
     if (!cleaned.exercises.length) { setActive(null); return; }
@@ -809,6 +846,35 @@ export default function StrengthTab({ C, data, update, onBack }) {
           </div>
         </div>
       )}
+
+      {/* ═══ NOTE EDITOR MODAL ═══ */}
+      {editingNoteFor && (()=>{
+        const def = EX.find(e=>e.id===editingNoteFor);
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(10px)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget){saveNoteEditor()}}}>
+            <div style={{background:C.surface,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",animation:"slideUp 0.25s ease-out"}}>
+              <div style={{width:40,height:5,borderRadius:3,background:C.border,margin:"0 auto 16px"}}/>
+              <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>Cues & Notizen</div>
+              <div style={{fontSize:13,color:C.muted,marginBottom:16}}>{def?.name}</div>
+              <div style={{fontSize:11,color:C.dim,marginBottom:8,fontWeight:600}}>Permanente Hinweise für diese Übung (z.B. "Ellbogen eng", "Maschine #7", "Handgelenk-Bandagen ab 80kg")</div>
+              <textarea
+                value={noteText}
+                onChange={e=>setNoteText(e.target.value)}
+                placeholder="Cues eingeben..."
+                rows={4}
+                style={{width:"100%",padding:"14px 16px",background:C.card,border:`1px solid ${C.border}`,borderRadius:14,color:C.text,fontSize:14,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",resize:"vertical",lineHeight:1.5}}
+              />
+              <div style={{display:"flex",gap:10,marginTop:16}}>
+                <button onClick={saveNoteEditor} style={{flex:1,padding:"14px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Speichern</button>
+                <button onClick={()=>setEditingNoteFor(null)} style={{padding:"14px 22px",background:C.card,color:C.muted,border:`1px solid ${C.border}`,borderRadius:14,fontSize:15,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>Abb.</button>
+              </div>
+              {noteText.trim() && (
+                <button onClick={()=>{setNoteText("");}} style={{width:"100%",padding:"10px 0",background:"transparent",color:C.ember,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit",marginTop:8,fontWeight:600}}>Notiz löschen</button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══ WORKOUT SUMMARY ═══ */}
       {summary && (
@@ -965,6 +1031,34 @@ export default function StrengthTab({ C, data, update, onBack }) {
                 {sug && <div style={{background:C.goldBg,borderRadius:10,padding:"8px 12px",marginBottom:8,border:`1px solid ${C.gold}20`,fontSize:12,color:C.gold,fontWeight:600}}>{sug.reason}</div>}
                 {prev && <div style={{fontSize:11,color:C.dim,marginBottom:6}}>Letztes Mal ({new Date(prev.date).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})}): {prev.sets.map(s=>`${s.weight}x${s.reps}${s.type&&s.type!=="N"?` (${s.type})`:""}${s.rpe?` @${s.rpe}`:""}`).join(" / ")}</div>}
 
+                {/* ═══ NOTES AREA ═══ */}
+                {(()=>{
+                  const pNote = getExNote(ex.exerciseId);
+                  return (
+                    <div style={{marginBottom:8}}>
+                      {/* Persistent cues */}
+                      {pNote && (
+                        <div onClick={()=>openNoteEditor(ex.exerciseId)} style={{background:`${C.sky}0a`,borderRadius:10,padding:"8px 12px",marginBottom:6,border:`1px solid ${C.sky}18`,cursor:"pointer"}}>
+                          <div style={{fontSize:9,fontWeight:700,color:C.sky,letterSpacing:1.5,marginBottom:3}}>CUES</div>
+                          <div style={{fontSize:12,color:C.sub,lineHeight:1.4,whiteSpace:"pre-wrap"}}>{pNote}</div>
+                        </div>
+                      )}
+                      {/* Session note input */}
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        <input
+                          value={ex.sessionNote||""}
+                          onChange={e=>updateSessionNote(ei,e.target.value)}
+                          placeholder="Session-Notiz..."
+                          style={{flex:1,padding:"7px 12px",background:C.card,border:`1px solid ${C.border}`,borderRadius:8,color:C.text,fontSize:12,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box"}}
+                        />
+                        {!pNote && (
+                          <button onClick={()=>openNoteEditor(ex.exerciseId)} style={{padding:"7px 10px",borderRadius:8,background:C.card,border:`1px solid ${C.border}`,color:C.dim,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Cues</button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Warm-up actions */}
                 {isWarmupRelevant(ex.exerciseId) && (()=>{
                   const hasWarmup = ex.sets.some(s => s.type === "W");
@@ -1089,7 +1183,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
         <div>
           {/* Exercise Detail View */}
           {detailEx ? (
-            <ExerciseDetail exerciseId={detailEx} sLog={sLog} C={C} onClose={()=>setDetailEx(null)} />
+            <ExerciseDetail exerciseId={detailEx} sLog={sLog} C={C} onClose={()=>setDetailEx(null)} exerciseNotes={exerciseNotes} onEditNote={openNoteEditor} />
           ) : sLog.length===0 ? (
             <div style={{textAlign:"center",padding:"60px 20px",color:C.dim,fontSize:14}}>Noch keine Kraft-Workouts</div>
           ) : (
@@ -1137,6 +1231,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
                         <span style={{fontWeight:600}}>{def?.name||ex.exerciseId}</span>
                         <span style={{color:C.muted}}> — {ex.sets.filter(s=>s.type!=="W").map(s=>`${s.weight}x${s.reps}`).join(", ")}</span>
                         <span style={{color:C.dim}}> ({Math.round(vol)}kg)</span>
+                        {ex.sessionNote && <div style={{fontSize:11,color:C.sky,fontStyle:"italic",marginTop:1}}>{ex.sessionNote}</div>}
                       </div>
                     );
                   })}

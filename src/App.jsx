@@ -127,7 +127,7 @@ function TI({type,size=36}){
 }
 
 export default function App(){
-  const [data, setData] = useState({ workouts:[], startDate:null, strengthLog:[], strengthTemplates:[], trainingDays:[], userEquipment:undefined });
+  const [data, setData] = useState({ workouts:[], startDate:null, strengthLog:[], strengthTemplates:[], trainingDays:[], userEquipment:undefined, exerciseNotes:{} });
   const [mode, setMode] = useState(null); // null=selector, "cardio", "strength"
   const [view, setView] = useState("dash");
   const [modal, setModal] = useState(false);
