@@ -915,6 +915,97 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
 
   const recMap = useMemo(() => { const r = {}; MG.forEach(m => { r[m.id] = muscleRec(m.id, sLog); }); return r; }, [sLog]);
 
+  // ═══ DELOAD / PERIODIZATION DETECTION ═══
+  const deloadAdvice = useMemo(() => {
+    if (sLog.length < 8) return null; // need enough data
+
+    // Group workouts by week (ISO week start = Monday)
+    const getWeekKey = (dateStr) => {
+      const d = new Date(dateStr);
+      const day = d.getDay(); // 0=Sun
+      const mon = new Date(d);
+      mon.setDate(d.getDate() - ((day + 6) % 7)); // shift to Monday
+      return mon.toISOString().slice(0, 10);
+    };
+
+    const weekMap = {};
+    sLog.forEach(w => {
+      const wk = getWeekKey(w.date);
+      if (!weekMap[wk]) weekMap[wk] = { vol: 0, sessions: 0, rpes: [], best1rms: {} };
+      weekMap[wk].sessions++;
+      (w.exercises || []).forEach(ex => {
+        const work = ex.sets.filter(s => s.type !== "W");
+        work.forEach(s => {
+          weekMap[wk].vol += (+s.weight || 0) * (+s.reps || 0);
+          if (+s.rpe > 0) weekMap[wk].rpes.push(+s.rpe);
+          const rm = est1RM(+s.weight || 0, +s.reps || 0);
+          if (rm > (weekMap[wk].best1rms[ex.exerciseId] || 0)) weekMap[wk].best1rms[ex.exerciseId] = rm;
+        });
+      });
+    });
+
+    // Sort weeks chronologically, take last 6
+    const weeks = Object.entries(weekMap).sort((a, b) => a[0].localeCompare(b[0]));
+    if (weeks.length < 4) return null;
+    const recent = weeks.slice(-6);
+
+    // Signal 1: Volume consistently rising for 4+ weeks
+    let risingWeeks = 0;
+    for (let i = 1; i < recent.length; i++) {
+      if (recent[i][1].vol > recent[i - 1][1].vol * 0.95) risingWeeks++;
+    }
+    const volumeRising = risingWeeks >= 3;
+
+    // Signal 2: Average RPE trending high (>8) in last 2 weeks
+    const recentRpes = recent.slice(-2).flatMap(([, d]) => d.rpes);
+    const avgRpe = recentRpes.length ? recentRpes.reduce((a, b) => a + b, 0) / recentRpes.length : 0;
+    const rpeHigh = avgRpe >= 8;
+
+    // Signal 3: 1RM stagnation — find main compounds and check if best 1RM hasn't improved
+    const compoundIds = ["bench_bb", "squat_bb", "deadlift", "ohp_bb", "row_bb"];
+    let stagnatedLifts = 0;
+    let checkedLifts = 0;
+    compoundIds.forEach(eid => {
+      const hist = getExerciseHistory(eid, sLog);
+      if (hist.length < 4) return;
+      checkedLifts++;
+      const last3 = hist.slice(-3).map(h => h.best1rm);
+      const older = hist.slice(-6, -3).map(h => h.best1rm);
+      if (!older.length) return;
+      const recentMax = Math.max(...last3);
+      const olderMax = Math.max(...older);
+      if (recentMax <= olderMax * 1.01) stagnatedLifts++; // less than 1% improvement = stagnation
+    });
+    const liftsStagnating = checkedLifts > 0 && stagnatedLifts >= Math.ceil(checkedLifts * 0.5);
+
+    // Signal 4: Consecutive weeks without a rest week (>4 weeks of 3+ sessions)
+    const consecutiveHeavy = recent.filter(([, d]) => d.sessions >= 3).length;
+    const longStreak = consecutiveHeavy >= 4;
+
+    // Decision: need at least 2 signals
+    const signals = [volumeRising, rpeHigh, liftsStagnating, longStreak].filter(Boolean);
+    if (signals.length < 2) return null;
+
+    // Build reasons
+    const reasons = [];
+    if (volumeRising) reasons.push(`Volumen steigt seit ${risingWeeks + 1} Wochen`);
+    if (rpeHigh) reasons.push(`Ø RPE der letzten 2 Wochen: ${avgRpe.toFixed(1)}`);
+    if (liftsStagnating) reasons.push(`${stagnatedLifts} Grundübung${stagnatedLifts > 1 ? "en" : ""} stagniert`);
+    if (longStreak) reasons.push(`${consecutiveHeavy} Wochen ohne Entlastung`);
+
+    // Calculate deload volume suggestion
+    const lastWeekVol = recent[recent.length - 1]?.[1]?.vol || 0;
+    const deloadVol = Math.round(lastWeekVol * 0.6);
+
+    return {
+      signals: signals.length,
+      reasons,
+      lastWeekVol: Math.round(lastWeekVol),
+      deloadVol,
+      severity: signals.length >= 3 ? "high" : "medium",
+    };
+  }, [sLog]);
+
   // Filtered exercises for picker
   const filteredEx = useMemo(() => {
     let list = availableEx;
@@ -1260,6 +1351,45 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
               <div style={{display:"flex",gap:8}}>
                 <button onClick={startAiWorkout} style={{flex:1,padding:"14px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:12,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase"}}>Starten</button>
                 <button onClick={generateAiWorkout} disabled={aiLoading} style={{padding:"14px 18px",background:C.card,color:C.sub,border:`1px solid ${C.border}`,borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>↻ Neu</button>
+              </div>
+            </div>
+          )}
+
+          {/* Deload / Periodization Alert */}
+          {deloadAdvice && (
+            <div style={{
+              marginBottom:18,borderRadius:16,overflow:"hidden",
+              border:`1px solid ${deloadAdvice.severity === "high" ? "rgba(196,106,106,0.3)" : "rgba(212,162,78,0.25)"}`,
+              background: deloadAdvice.severity === "high"
+                ? "linear-gradient(135deg, rgba(196,106,106,0.08), rgba(196,106,106,0.03))"
+                : "linear-gradient(135deg, rgba(212,162,78,0.08), rgba(212,162,78,0.03))",
+            }}>
+              <div style={{padding:"16px 18px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:deloadAdvice.severity==="high"?"rgba(196,106,106,0.12)":"rgba(212,162,78,0.12)",border:`1px solid ${deloadAdvice.severity==="high"?"rgba(196,106,106,0.25)":"rgba(212,162,78,0.2)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>⚡</div>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:800,color:deloadAdvice.severity==="high"?"#c46a6a":"#d4a24e"}}>Deload empfohlen</div>
+                    <div style={{fontSize:10,color:C.muted,marginTop:1}}>{deloadAdvice.signals} Signale erkannt</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
+                  {deloadAdvice.reasons.map((r, i) => (
+                    <div key={i} style={{fontSize:11,color:C.sub,display:"flex",alignItems:"center",gap:6}}>
+                      <div style={{width:4,height:4,borderRadius:2,background:deloadAdvice.severity==="high"?"#c46a6a":"#d4a24e",flexShrink:0}}/>
+                      {r}
+                    </div>
+                  ))}
+                </div>
+                <div style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 14px",border:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:9,color:C.dim,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700}}>Empfehlung</div>
+                    <div style={{fontSize:12,color:C.text,fontWeight:600,marginTop:2}}>Diese Woche: ~{Math.round(deloadAdvice.deloadVol/1000)}t Volumen (−40%)</div>
+                  </div>
+                  <div style={{fontSize:10,color:C.dim,textAlign:"right"}}>
+                    <div>Letzte Woche</div>
+                    <div style={{fontWeight:700,color:C.sub}}>{Math.round(deloadAdvice.lastWeekVol/1000)}t</div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
