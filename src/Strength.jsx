@@ -723,6 +723,8 @@ export default function StrengthTab({ C, data, update, onBack }) {
     const apiKey = getAiKey();
     if (!apiKey) { alert("Kein AI API-Key hinterlegt. Gehe zu Daten → AI API-Key eingeben."); return; }
 
+    const baseUrl = apiKey.startsWith("ak-") ? "https://api.moonshot.cn/v1" : "https://api.moonshot.ai/v1";
+
     setAiLoading(true);
     setAiWorkout(null);
     try {
@@ -768,7 +770,6 @@ ${exList}
 Antworte NUR mit einem JSON-Objekt, kein anderer Text:
 {"name": "Workout-Name", "exercises": ["exercise_id_1", "exercise_id_2", ...], "reason": "Kurze Begründung auf Deutsch warum diese Auswahl"}`;
 
-      const baseUrl = apiKey.startsWith("ak-") ? "https://api.moonshot.cn/v1" : "https://api.moonshot.ai/v1";
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -785,7 +786,7 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
 
       if (!response.ok) {
         const err = await response.text();
-        throw new Error(`API ${response.status}: ${err.slice(0, 100)}`);
+        throw new Error(`API ${response.status} @ ${baseUrl}\nKey: ${apiKey.slice(0,6)}...\n${err.slice(0, 150)}`);
       }
 
       const resData = await response.json();
