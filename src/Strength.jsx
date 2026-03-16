@@ -17,98 +17,111 @@ const MG = [
 ];
 
 const EX = [
-  {id:"bench_bb",name:"Bankdrücken (LH)",m:"chest",s:["triceps","shoulders"],inc:2.5},
-  {id:"bench_db",name:"Bankdrücken (KH)",m:"chest",s:["triceps","shoulders"],inc:2},
-  {id:"incline_bb",name:"Schrägbankdrücken (LH)",m:"chest",s:["shoulders","triceps"],inc:2.5},
-  {id:"incline_db",name:"Schrägbankdrücken (KH)",m:"chest",s:["shoulders","triceps"],inc:2},
-  {id:"decline_bb",name:"Decline Bench (LH)",m:"chest",s:["triceps"],inc:2.5},
-  {id:"chest_press_machine",name:"Brustpresse (Maschine)",m:"chest",s:["triceps","shoulders"],inc:2.5},
-  {id:"chest_fly_db",name:"Flys (KH)",m:"chest",s:[],inc:2},
-  {id:"chest_fly_cable",name:"Cable Flys",m:"chest",s:[],inc:2.5},
-  {id:"chest_fly_machine",name:"Butterfly (Maschine)",m:"chest",s:[],inc:2.5},
-  {id:"pec_deck",name:"Pec Deck",m:"chest",s:[],inc:2.5},
-  {id:"dips",name:"Dips",m:"chest",s:["triceps","shoulders"],inc:5,bw:true},
-  {id:"pushup",name:"Liegestütze",m:"chest",s:["triceps"],inc:0,bw:true},
-  {id:"deadlift",name:"Kreuzheben",m:"back",s:["hams","glutes","core","traps"],inc:2.5},
-  {id:"row_bb",name:"Langhantelrudern",m:"back",s:["biceps","traps"],inc:2.5},
-  {id:"row_db",name:"KH-Rudern einarmig",m:"back",s:["biceps"],inc:2},
-  {id:"row_machine",name:"Rudern (Maschine eng)",m:"back",s:["biceps"],inc:2.5},
-  {id:"row_machine_single",name:"Rudern einarmig (Maschine)",m:"back",s:["biceps"],inc:2.5},
-  {id:"pullup",name:"Klimmzüge",m:"back",s:["biceps"],inc:0,bw:true},
-  {id:"chinup",name:"Chin-Ups",m:"back",s:["biceps"],inc:0,bw:true},
-  {id:"lat_pull_wide",name:"Latzug breit",m:"back",s:["biceps"],inc:2.5},
-  {id:"lat_pull_close",name:"Latzug eng",m:"back",s:["biceps"],inc:2.5},
-  {id:"cable_row",name:"Kabelrudern sitzend",m:"back",s:["biceps","traps"],inc:2.5},
-  {id:"tbar_row",name:"T-Bar Rudern",m:"back",s:["biceps","traps"],inc:2.5},
-  {id:"pullover",name:"Pullover",m:"back",s:["chest"],inc:2},
-  {id:"hyperext",name:"Hyperextensions",m:"back",s:["glutes","hams"],inc:5,bw:true},
-  {id:"ohp_smith",name:"Schulterdrücken (Smith)",m:"shoulders",s:["triceps","traps"],inc:2.5},
-  {id:"ohp_bb",name:"Schulterdrücken (LH)",m:"shoulders",s:["triceps","traps"],inc:2.5},
-  {id:"ohp_db",name:"Schulterdrücken (KH) sitzend",m:"shoulders",s:["triceps"],inc:2},
-  {id:"ohp_machine",name:"Schulterdrücken (Maschine)",m:"shoulders",s:["triceps"],inc:2.5},
-  {id:"lat_raise_db",name:"Seitheben (KH)",m:"shoulders",s:[],inc:1},
-  {id:"lat_raise_cable",name:"Seitheben (Kabel)",m:"shoulders",s:[],inc:1},
-  {id:"lat_raise_lean",name:"Seitheben angelehnt (Bank)",m:"shoulders",s:[],inc:1},
-  {id:"front_raise",name:"Frontheben",m:"shoulders",s:[],inc:1},
-  {id:"face_pull",name:"Face Pulls",m:"shoulders",s:["back","traps"],inc:2.5},
-  {id:"rear_delt_cable",name:"Reverse Flys (Kabel/Seil)",m:"shoulders",s:["back"],inc:1},
-  {id:"rear_delt_machine",name:"Reverse Flys (Maschine)",m:"shoulders",s:["back"],inc:2.5},
-  {id:"upright_row",name:"Aufrechtes Rudern",m:"shoulders",s:["traps"],inc:2.5},
-  {id:"arnold_press",name:"Arnold Press",m:"shoulders",s:["triceps"],inc:2},
-  {id:"shrugs_db",name:"Shrugs (KH)",m:"traps",s:["shoulders"],inc:5},
-  {id:"shrugs_bb",name:"Shrugs (LH)",m:"traps",s:["shoulders"],inc:5},
-  {id:"curl_bb",name:"Langhantel-Curls",m:"biceps",s:[],inc:2.5},
-  {id:"curl_db",name:"KH-Curls",m:"biceps",s:[],inc:2},
-  {id:"curl_ez",name:"SZ-Curls",m:"biceps",s:[],inc:2.5},
-  {id:"hammer_curl",name:"Hammer Curls",m:"biceps",s:["forearms"],inc:2},
-  {id:"preacher_curl",name:"Preacher Curls (Sitzbank)",m:"biceps",s:[],inc:2},
-  {id:"preacher_machine",name:"Bizeps (Maschine/Curl-Sitz)",m:"biceps",s:[],inc:2.5},
-  {id:"incline_curl",name:"Incline Curls",m:"biceps",s:[],inc:2},
-  {id:"cable_curl",name:"Bizeps Curls (Kabel)",m:"biceps",s:[],inc:2.5},
-  {id:"conc_curl",name:"Concentration Curls",m:"biceps",s:[],inc:1},
-  {id:"spider_curl",name:"Spider Curls",m:"biceps",s:[],inc:2},
-  {id:"tri_pushdown_rope",name:"Trizepsdrücken (Seil)",m:"triceps",s:[],inc:2.5},
-  {id:"tri_pushdown_bar",name:"Trizepsdrücken (Stange)",m:"triceps",s:[],inc:2.5},
-  {id:"tri_pushdown_single",name:"Trizepsdrücken einarmig (Kabel)",m:"triceps",s:[],inc:1},
-  {id:"tri_overhead_db",name:"Overhead Extension (KH)",m:"triceps",s:[],inc:2},
-  {id:"tri_overhead_cable",name:"Overhead Extension (Kabel)",m:"triceps",s:[],inc:2.5},
-  {id:"skull_crush",name:"Skull Crushers",m:"triceps",s:[],inc:2},
-  {id:"tri_dip",name:"Trizeps-Dips",m:"triceps",s:["chest"],inc:0,bw:true},
-  {id:"tri_kickback",name:"Kickbacks",m:"triceps",s:[],inc:1},
-  {id:"close_grip_bench",name:"Enges Bankdrücken",m:"triceps",s:["chest"],inc:2.5},
-  {id:"squat_bb",name:"Kniebeugen (LH)",m:"quads",s:["glutes","core"],inc:2.5},
-  {id:"squat_front",name:"Front Squats",m:"quads",s:["core","glutes"],inc:2.5},
-  {id:"squat_smith",name:"Kniebeugen (Smith)",m:"quads",s:["glutes"],inc:2.5},
-  {id:"leg_press",name:"Beinpresse",m:"quads",s:["glutes"],inc:5},
-  {id:"leg_ext",name:"Beinstrecker",m:"quads",s:[],inc:2.5},
-  {id:"lunge_db",name:"Ausfallschritte (KH)",m:"quads",s:["glutes","hams"],inc:2},
-  {id:"bulgarian",name:"Bulgarian Split Squats",m:"quads",s:["glutes"],inc:2},
-  {id:"hack_squat",name:"Hack Squat",m:"quads",s:["glutes"],inc:5},
-  {id:"goblet_squat",name:"Goblet Squat",m:"quads",s:["core","glutes"],inc:2},
-  {id:"rdl",name:"Rumänisches Kreuzheben",m:"hams",s:["back","glutes"],inc:2.5},
-  {id:"leg_curl_lying",name:"Beinbeuger liegend",m:"hams",s:[],inc:2.5},
-  {id:"leg_curl_seated",name:"Beinbeuger sitzend",m:"hams",s:[],inc:2.5},
-  {id:"good_morning",name:"Good Mornings",m:"hams",s:["back","glutes"],inc:2.5},
-  {id:"stiff_leg_dl",name:"Gestrecktes Kreuzheben",m:"hams",s:["back","glutes"],inc:2.5},
-  {id:"hip_thrust",name:"Hip Thrust",m:"glutes",s:["hams"],inc:5},
-  {id:"glute_bridge",name:"Glute Bridge",m:"glutes",s:["hams"],inc:5},
-  {id:"cable_kickback",name:"Cable Kickbacks",m:"glutes",s:[],inc:2.5},
-  {id:"calf_raise_stand",name:"Wadenheben stehend",m:"calves",s:[],inc:5},
-  {id:"calf_raise_seated",name:"Wadenheben sitzend",m:"calves",s:[],inc:5},
-  {id:"plank",name:"Plank",m:"core",s:[],inc:0,timed:true},
-  {id:"crunch",name:"Crunches",m:"core",s:[],inc:0,bw:true},
-  {id:"crunch_machine",name:"Bauchpresse (Maschine)",m:"core",s:[],inc:2.5},
-  {id:"cable_crunch",name:"Kabel-Crunches",m:"core",s:[],inc:2.5},
-  {id:"hanging_leg",name:"Hanging Leg Raises",m:"core",s:[],inc:0,bw:true},
-  {id:"ab_wheel",name:"Ab Wheel Rollout",m:"core",s:[],inc:0,bw:true},
-  {id:"russian_twist",name:"Russian Twists",m:"core",s:[],inc:2},
-  {id:"woodchop",name:"Woodchops (Kabel)",m:"core",s:["shoulders"],inc:2.5},
-  {id:"situp",name:"Sit-Ups",m:"core",s:[],inc:0,bw:true},
-  {id:"decline_crunch",name:"Decline Crunches",m:"core",s:[],inc:0,bw:true},
-  {id:"wrist_curl",name:"Wrist Curls",m:"forearms",s:[],inc:1},
-  {id:"reverse_curl",name:"Reverse Curls",m:"forearms",s:["biceps"],inc:2},
-  {id:"farmer_walk",name:"Farmer Walks",m:"forearms",s:["traps","core"],inc:5},
-  {id:"plate_pinch",name:"Plate Pinch Hold",m:"forearms",s:[],inc:0,timed:true},
+  {id:"bench_bb",name:"Bankdrücken (LH)",m:"chest",s:["triceps","shoulders"],inc:2.5,eq:["bb","bench"]},
+  {id:"bench_db",name:"Bankdrücken (KH)",m:"chest",s:["triceps","shoulders"],inc:2,eq:["db","bench"]},
+  {id:"incline_bb",name:"Schrägbankdrücken (LH)",m:"chest",s:["shoulders","triceps"],inc:2.5,eq:["bb","bench"]},
+  {id:"incline_db",name:"Schrägbankdrücken (KH)",m:"chest",s:["shoulders","triceps"],inc:2,eq:["db","bench"]},
+  {id:"decline_bb",name:"Decline Bench (LH)",m:"chest",s:["triceps"],inc:2.5,eq:["bb","bench"]},
+  {id:"chest_press_machine",name:"Brustpresse (Maschine)",m:"chest",s:["triceps","shoulders"],inc:2.5,eq:["machine"]},
+  {id:"chest_fly_db",name:"Flys (KH)",m:"chest",s:[],inc:2,eq:["db","bench"]},
+  {id:"chest_fly_cable",name:"Cable Flys",m:"chest",s:[],inc:2.5,eq:["cable"]},
+  {id:"chest_fly_machine",name:"Butterfly (Maschine)",m:"chest",s:[],inc:2.5,eq:["machine"]},
+  {id:"pec_deck",name:"Pec Deck",m:"chest",s:[],inc:2.5,eq:["machine"]},
+  {id:"dips",name:"Dips",m:"chest",s:["triceps","shoulders"],inc:5,bw:true,eq:["bw"]},
+  {id:"pushup",name:"Liegestütze",m:"chest",s:["triceps"],inc:0,bw:true,eq:["bw"]},
+  {id:"deadlift",name:"Kreuzheben",m:"back",s:["hams","glutes","core","traps"],inc:2.5,eq:["bb"]},
+  {id:"row_bb",name:"Langhantelrudern",m:"back",s:["biceps","traps"],inc:2.5,eq:["bb"]},
+  {id:"row_db",name:"KH-Rudern einarmig",m:"back",s:["biceps"],inc:2,eq:["db","bench"]},
+  {id:"row_machine",name:"Rudern (Maschine eng)",m:"back",s:["biceps"],inc:2.5,eq:["machine"]},
+  {id:"row_machine_single",name:"Rudern einarmig (Maschine)",m:"back",s:["biceps"],inc:2.5,eq:["machine"]},
+  {id:"pullup",name:"Klimmzüge",m:"back",s:["biceps"],inc:0,bw:true,eq:["bw","pullup_bar"]},
+  {id:"chinup",name:"Chin-Ups",m:"back",s:["biceps"],inc:0,bw:true,eq:["bw","pullup_bar"]},
+  {id:"lat_pull_wide",name:"Latzug breit",m:"back",s:["biceps"],inc:2.5,eq:["cable"]},
+  {id:"lat_pull_close",name:"Latzug eng",m:"back",s:["biceps"],inc:2.5,eq:["cable"]},
+  {id:"cable_row",name:"Kabelrudern sitzend",m:"back",s:["biceps","traps"],inc:2.5,eq:["cable"]},
+  {id:"tbar_row",name:"T-Bar Rudern",m:"back",s:["biceps","traps"],inc:2.5,eq:["bb"]},
+  {id:"pullover",name:"Pullover",m:"back",s:["chest"],inc:2,eq:["db","bench"]},
+  {id:"hyperext",name:"Hyperextensions",m:"back",s:["glutes","hams"],inc:5,bw:true,eq:["bw"]},
+  {id:"ohp_smith",name:"Schulterdrücken (Smith)",m:"shoulders",s:["triceps","traps"],inc:2.5,eq:["smith"]},
+  {id:"ohp_bb",name:"Schulterdrücken (LH)",m:"shoulders",s:["triceps","traps"],inc:2.5,eq:["bb"]},
+  {id:"ohp_db",name:"Schulterdrücken (KH) sitzend",m:"shoulders",s:["triceps"],inc:2,eq:["db","bench"]},
+  {id:"ohp_machine",name:"Schulterdrücken (Maschine)",m:"shoulders",s:["triceps"],inc:2.5,eq:["machine"]},
+  {id:"lat_raise_db",name:"Seitheben (KH)",m:"shoulders",s:[],inc:1,eq:["db"]},
+  {id:"lat_raise_cable",name:"Seitheben (Kabel)",m:"shoulders",s:[],inc:1,eq:["cable"]},
+  {id:"lat_raise_lean",name:"Seitheben angelehnt (Bank)",m:"shoulders",s:[],inc:1,eq:["db","bench"]},
+  {id:"front_raise",name:"Frontheben",m:"shoulders",s:[],inc:1,eq:["db"]},
+  {id:"face_pull",name:"Face Pulls",m:"shoulders",s:["back","traps"],inc:2.5,eq:["cable"]},
+  {id:"rear_delt_cable",name:"Reverse Flys (Kabel/Seil)",m:"shoulders",s:["back"],inc:1,eq:["cable"]},
+  {id:"rear_delt_machine",name:"Reverse Flys (Maschine)",m:"shoulders",s:["back"],inc:2.5,eq:["machine"]},
+  {id:"upright_row",name:"Aufrechtes Rudern",m:"shoulders",s:["traps"],inc:2.5,eq:["bb"]},
+  {id:"arnold_press",name:"Arnold Press",m:"shoulders",s:["triceps"],inc:2,eq:["db"]},
+  {id:"shrugs_db",name:"Shrugs (KH)",m:"traps",s:["shoulders"],inc:5,eq:["db"]},
+  {id:"shrugs_bb",name:"Shrugs (LH)",m:"traps",s:["shoulders"],inc:5,eq:["bb"]},
+  {id:"curl_bb",name:"Langhantel-Curls",m:"biceps",s:[],inc:2.5,eq:["bb"]},
+  {id:"curl_db",name:"KH-Curls",m:"biceps",s:[],inc:2,eq:["db"]},
+  {id:"curl_ez",name:"SZ-Curls",m:"biceps",s:[],inc:2.5,eq:["ez"]},
+  {id:"hammer_curl",name:"Hammer Curls",m:"biceps",s:["forearms"],inc:2,eq:["db"]},
+  {id:"preacher_curl",name:"Preacher Curls (Sitzbank)",m:"biceps",s:[],inc:2,eq:["ez","bench"]},
+  {id:"preacher_machine",name:"Bizeps (Maschine/Curl-Sitz)",m:"biceps",s:[],inc:2.5,eq:["machine"]},
+  {id:"incline_curl",name:"Incline Curls",m:"biceps",s:[],inc:2,eq:["db","bench"]},
+  {id:"cable_curl",name:"Bizeps Curls (Kabel)",m:"biceps",s:[],inc:2.5,eq:["cable"]},
+  {id:"conc_curl",name:"Concentration Curls",m:"biceps",s:[],inc:1,eq:["db"]},
+  {id:"spider_curl",name:"Spider Curls",m:"biceps",s:[],inc:2,eq:["db","bench"]},
+  {id:"tri_pushdown_rope",name:"Trizepsdrücken (Seil)",m:"triceps",s:[],inc:2.5,eq:["cable"]},
+  {id:"tri_pushdown_bar",name:"Trizepsdrücken (Stange)",m:"triceps",s:[],inc:2.5,eq:["cable"]},
+  {id:"tri_pushdown_single",name:"Trizepsdrücken einarmig (Kabel)",m:"triceps",s:[],inc:1,eq:["cable"]},
+  {id:"tri_overhead_db",name:"Overhead Extension (KH)",m:"triceps",s:[],inc:2,eq:["db"]},
+  {id:"tri_overhead_cable",name:"Overhead Extension (Kabel)",m:"triceps",s:[],inc:2.5,eq:["cable"]},
+  {id:"skull_crush",name:"Skull Crushers",m:"triceps",s:[],inc:2,eq:["ez","bench"]},
+  {id:"tri_dip",name:"Trizeps-Dips",m:"triceps",s:["chest"],inc:0,bw:true,eq:["bw"]},
+  {id:"tri_kickback",name:"Kickbacks",m:"triceps",s:[],inc:1,eq:["db"]},
+  {id:"close_grip_bench",name:"Enges Bankdrücken",m:"triceps",s:["chest"],inc:2.5,eq:["bb","bench"]},
+  {id:"squat_bb",name:"Kniebeugen (LH)",m:"quads",s:["glutes","core"],inc:2.5,eq:["bb","rack"]},
+  {id:"squat_front",name:"Front Squats",m:"quads",s:["core","glutes"],inc:2.5,eq:["bb","rack"]},
+  {id:"squat_smith",name:"Kniebeugen (Smith)",m:"quads",s:["glutes"],inc:2.5,eq:["smith"]},
+  {id:"leg_press",name:"Beinpresse",m:"quads",s:["glutes"],inc:5,eq:["machine"]},
+  {id:"leg_ext",name:"Beinstrecker",m:"quads",s:[],inc:2.5,eq:["machine"]},
+  {id:"lunge_db",name:"Ausfallschritte (KH)",m:"quads",s:["glutes","hams"],inc:2,eq:["db"]},
+  {id:"bulgarian",name:"Bulgarian Split Squats",m:"quads",s:["glutes"],inc:2,eq:["db","bench"]},
+  {id:"hack_squat",name:"Hack Squat",m:"quads",s:["glutes"],inc:5,eq:["machine"]},
+  {id:"goblet_squat",name:"Goblet Squat",m:"quads",s:["core","glutes"],inc:2,eq:["db"]},
+  {id:"rdl",name:"Rumänisches Kreuzheben",m:"hams",s:["back","glutes"],inc:2.5,eq:["bb"]},
+  {id:"leg_curl_lying",name:"Beinbeuger liegend",m:"hams",s:[],inc:2.5,eq:["machine"]},
+  {id:"leg_curl_seated",name:"Beinbeuger sitzend",m:"hams",s:[],inc:2.5,eq:["machine"]},
+  {id:"good_morning",name:"Good Mornings",m:"hams",s:["back","glutes"],inc:2.5,eq:["bb"]},
+  {id:"stiff_leg_dl",name:"Gestrecktes Kreuzheben",m:"hams",s:["back","glutes"],inc:2.5,eq:["bb"]},
+  {id:"hip_thrust",name:"Hip Thrust",m:"glutes",s:["hams"],inc:5,eq:["bb","bench"]},
+  {id:"glute_bridge",name:"Glute Bridge",m:"glutes",s:["hams"],inc:5,eq:["bb"]},
+  {id:"cable_kickback",name:"Cable Kickbacks",m:"glutes",s:[],inc:2.5,eq:["cable"]},
+  {id:"calf_raise_stand",name:"Wadenheben stehend",m:"calves",s:[],inc:5,eq:["machine"]},
+  {id:"calf_raise_seated",name:"Wadenheben sitzend",m:"calves",s:[],inc:5,eq:["machine"]},
+  {id:"plank",name:"Plank",m:"core",s:[],inc:0,timed:true,eq:["bw"]},
+  {id:"crunch",name:"Crunches",m:"core",s:[],inc:0,bw:true,eq:["bw"]},
+  {id:"crunch_machine",name:"Bauchpresse (Maschine)",m:"core",s:[],inc:2.5,eq:["machine"]},
+  {id:"cable_crunch",name:"Kabel-Crunches",m:"core",s:[],inc:2.5,eq:["cable"]},
+  {id:"hanging_leg",name:"Hanging Leg Raises",m:"core",s:[],inc:0,bw:true,eq:["bw","pullup_bar"]},
+  {id:"ab_wheel",name:"Ab Wheel Rollout",m:"core",s:[],inc:0,bw:true,eq:["bw"]},
+  {id:"russian_twist",name:"Russian Twists",m:"core",s:[],inc:2,eq:["db"]},
+  {id:"woodchop",name:"Woodchops (Kabel)",m:"core",s:["shoulders"],inc:2.5,eq:["cable"]},
+  {id:"situp",name:"Sit-Ups",m:"core",s:[],inc:0,bw:true,eq:["bw"]},
+  {id:"decline_crunch",name:"Decline Crunches",m:"core",s:[],inc:0,bw:true,eq:["bench"]},
+  {id:"wrist_curl",name:"Wrist Curls",m:"forearms",s:[],inc:1,eq:["db"]},
+  {id:"reverse_curl",name:"Reverse Curls",m:"forearms",s:["biceps"],inc:2,eq:["bb"]},
+  {id:"farmer_walk",name:"Farmer Walks",m:"forearms",s:["traps","core"],inc:5,eq:["db"]},
+  {id:"plate_pinch",name:"Plate Pinch Hold",m:"forearms",s:[],inc:0,timed:true,eq:["bw"]},
+];
+
+const EQUIPMENT = [
+  {id:"bb",name:"Langhantel",icon:"LH"},
+  {id:"db",name:"Kurzhanteln",icon:"KH"},
+  {id:"ez",name:"SZ-Stange",icon:"SZ"},
+  {id:"cable",name:"Kabelturm",icon:"KB"},
+  {id:"machine",name:"Maschinen",icon:"MA"},
+  {id:"smith",name:"Smith Machine",icon:"SM"},
+  {id:"bench",name:"Bank",icon:"BK"},
+  {id:"rack",name:"Rack/Ständer",icon:"RK"},
+  {id:"pullup_bar",name:"Klimmzugstange",icon:"KZ"},
+  {id:"bw",name:"Bodyweight",icon:"BW"},
 ];
 
 const SPLIT_PRESETS = {
@@ -145,38 +158,84 @@ const SPLIT_PRESETS = {
 // Set types: W=warmup, N=normal, D=drop, F=failure
 const SET_TYPES = [{id:"N",label:"Normal",color:"#F2EDE7"},{id:"W",label:"Warmup",color:"#D4A024"},{id:"D",label:"Drop",color:"#9C7BF2"},{id:"F",label:"Failure",color:"#E8553A"}];
 
-function suggestWeight(exerciseId, prevSets, goalReps=[8,12]) {
+function suggestWeight(exerciseId, prevSets, goalReps=[8,12], allLog=[], recoveryPct=100) {
   if (!prevSets?.length) return null;
   const ex = EX.find(e => e.id === exerciseId);
   if (!ex || ex.bw || ex.timed) return null;
-  // Only consider normal + failure sets for progression (not warmup/drop)
   const workSets = prevSets.filter(s => s.type !== "W" && s.type !== "D");
   if (!workSets.length) return null;
   const lw = workSets[0]?.weight || 0;
   if (lw === 0) return null;
-  // Factor in RPE: if avg RPE < 7, definitely ready to go up
-  const avgRpe = workSets.filter(s=>s.rpe>0).reduce((a,s,_,arr)=>a+s.rpe/arr.length,0);
+
+  // 1. RPE signal
+  const rpeVals = workSets.filter(s => s.rpe > 0).map(s => s.rpe);
+  const avgRpe = rpeVals.length ? rpeVals.reduce((a,b)=>a+b,0)/rpeVals.length : 0;
+
+  // 2. Rep performance
   const allHit = workSets.every(s => s.reps >= goalReps[1]);
+  const mostHit = workSets.filter(s => s.reps >= goalReps[0]).length >= workSets.length * 0.75;
   const anyBelow = workSets.some(s => s.reps < goalReps[0]);
-  if (allHit && avgRpe > 0 && avgRpe <= 7) return { weight: lw + ex.inc, reason: `Alle Sätze ${goalReps[1]}+ Reps, RPE ${avgRpe.toFixed(0)} → +${ex.inc} kg` };
-  if (allHit) return { weight: lw + ex.inc, reason: `Alle Sätze ${goalReps[1]}+ Reps → +${ex.inc} kg` };
-  if (anyBelow) return { weight: lw, reason: `Noch nicht im Zielbereich → Gewicht halten` };
-  if (avgRpe >= 9) return { weight: lw, reason: `RPE ${avgRpe.toFixed(0)} — Gewicht halten, erst Reps steigern` };
-  return { weight: lw, reason: `Weiter mit ${lw} kg, Reps steigern` };
+
+  // 3. Volume trend (last 4 sessions of this exercise)
+  const exHistory = allLog.flatMap(w => (w.exercises||[]).filter(e => e.exerciseId === exerciseId).map(e => ({
+    date: w.date, vol: e.sets.filter(s=>s.type!=="W"&&s.type!=="D").reduce((a,s)=>a+s.weight*s.reps,0),
+    best1rm: Math.max(0,...e.sets.filter(s=>s.type!=="W").map(s=>est1RM(s.weight,s.reps)))
+  }))).slice(-4);
+
+  const volTrend = exHistory.length >= 2 ? (exHistory[exHistory.length-1].vol - exHistory[0].vol) / Math.max(exHistory[0].vol,1) : 0;
+  const e1rmTrend = exHistory.length >= 2 ? exHistory[exHistory.length-1].best1rm - exHistory[0].best1rm : 0;
+
+  // 4. Recovery signal
+  const lowRecovery = recoveryPct < 50;
+
+  // Decision matrix
+  if (lowRecovery) {
+    return { weight: Math.max(lw - ex.inc, 0), reason: `Recovery ${recoveryPct}% — leichter starten, Verletzung vermeiden` };
+  }
+  if (allHit && avgRpe > 0 && avgRpe <= 6) {
+    return { weight: lw + ex.inc * 2, reason: `RPE ${avgRpe.toFixed(0)} + alle Reps → +${ex.inc*2} kg (doppelt)` };
+  }
+  if (allHit && avgRpe > 0 && avgRpe <= 7) {
+    return { weight: lw + ex.inc, reason: `RPE ${avgRpe.toFixed(0)} + alle Reps → +${ex.inc} kg` };
+  }
+  if (allHit) {
+    return { weight: lw + ex.inc, reason: `Alle Sätze ${goalReps[1]}+ Reps → +${ex.inc} kg` };
+  }
+  if (avgRpe >= 9.5) {
+    return { weight: lw, reason: `RPE ${avgRpe.toFixed(1)} — am Limit. Gewicht halten, Reps steigern` };
+  }
+  if (anyBelow && avgRpe >= 8.5) {
+    return { weight: lw, reason: `Unter Zielbereich bei hohem RPE — Gewicht halten` };
+  }
+  if (mostHit && e1rmTrend > 0) {
+    return { weight: lw, reason: `1RM steigt (+${e1rmTrend.toFixed(1)}kg) — Reps weiter steigern, dann Gewicht` };
+  }
+  if (volTrend < -0.15) {
+    return { weight: lw, reason: `Volumen rückläufig (${(volTrend*100).toFixed(0)}%) — stabilisieren` };
+  }
+  return { weight: lw, reason: `Weiter mit ${lw} kg, Reps Richtung ${goalReps[1]} steigern` };
 }
 
 function est1RM(w, r) { return r<=0||w<=0?0:r===1?w:Math.round(w*(36/(37-Math.min(r,36)))*10)/10; }
 
 function muscleRec(muscle, log) {
-  const now = Date.now(); let last = 0;
+  const now = Date.now(); let lastTime = 0; let lastVolume = 0;
   for (const w of log) for (const ex of (w.exercises||[])) {
     const d = EX.find(e => e.id === ex.exerciseId);
-    if (d && (d.m === muscle || d.s?.includes(muscle))) { const t = new Date(w.date).getTime(); if (t > last) last = t; }
+    if (d && (d.m === muscle || d.s?.includes(muscle))) {
+      const t = new Date(w.date).getTime();
+      if (t > lastTime) {
+        lastTime = t;
+        const isPrimary = d.m === muscle;
+        lastVolume = ex.sets.filter(s=>s.type!=="W").reduce((a,s)=>a+s.weight*s.reps,0) * (isPrimary ? 1 : 0.4);
+      }
+    }
   }
-  if (!last) return 100;
-  // Better recovery model: factor in volume
-  const daysSince = (now - last) / (1000*60*60*24);
-  return Math.min(100, Math.round(daysSince / 3 * 100));
+  if (!lastTime) return 100;
+  const daysSince = (now - lastTime) / (1000*60*60*24);
+  // Higher volume = longer recovery needed (2-4 days scale)
+  const recoveryDays = lastVolume > 5000 ? 4 : lastVolume > 2000 ? 3 : 2;
+  return Math.min(100, Math.round(daysSince / recoveryDays * 100));
 }
 
 // ═══ REST TIMER DEFAULTS (seconds) ═══
@@ -203,14 +262,25 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const sLog = data.strengthLog || [];
   const templates = data.strengthTemplates || [];
   const trainingDays = data.trainingDays || [];
+  const userEquipment = data.userEquipment || EQUIPMENT.map(e => e.id); // default: all
+  const [showEqSettings, setShowEqSettings] = useState(false);
 
-  const save = useCallback((log, tmpls, days) => {
+  const save = useCallback((log, tmpls, days, eq) => {
     update(prev => ({
       ...(log !== undefined ? { strengthLog: log } : {}),
       ...(tmpls !== undefined ? { strengthTemplates: tmpls } : {}),
       ...(days !== undefined ? { trainingDays: days } : {}),
+      ...(eq !== undefined ? { userEquipment: eq } : {}),
     }));
   }, [update]);
+
+  const toggleEquipment = (eqId) => {
+    const next = userEquipment.includes(eqId) ? userEquipment.filter(e => e !== eqId) : [...userEquipment, eqId];
+    save(undefined, undefined, undefined, next);
+  };
+
+  // Filter exercises by user equipment
+  const availableEx = useMemo(() => EX.filter(ex => ex.eq.some(e => userEquipment.includes(e))), [userEquipment]);
 
   // Recently used exercises
   const recentExIds = useMemo(() => {
@@ -249,7 +319,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
 
   const mkSets = (eid) => {
     const prev = getPrev(eid);
-    const sug = prev ? suggestWeight(eid, prev.sets) : null;
+    const sug = prev ? suggestWeight(eid, prev.sets, [8,12], sLog, recMap[EX.find(e=>e.id===eid)?.m]||100) : null;
     const dw = sug?.weight || (prev?.sets?.[0]?.weight || 0);
     return prev ? prev.sets.map(s => ({ weight: dw, reps: s.reps, done: false, type: s.type || "N", rpe: 0 })) :
       [{weight:0,reps:10,done:false,type:"N",rpe:0},{weight:0,reps:10,done:false,type:"N",rpe:0},{weight:0,reps:10,done:false,type:"N",rpe:0}];
@@ -344,14 +414,14 @@ export default function StrengthTab({ C, data, update, onBack }) {
 
   // Filtered exercises for picker
   const filteredEx = useMemo(() => {
-    let list = EX;
+    let list = availableEx;
     if (exFilter !== "all") list = list.filter(e => e.m === exFilter);
     if (searchQ.trim()) {
       const q = searchQ.toLowerCase();
       list = list.filter(e => e.name.toLowerCase().includes(q) || MG.find(m=>m.id===e.m)?.name.toLowerCase().includes(q));
     }
     return list;
-  }, [exFilter, searchQ]);
+  }, [exFilter, searchQ, availableEx]);
 
   const inp = {width:"100%",padding:"11px 14px",background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:14,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",textAlign:"center"};
   const sty = {card:{background:C.surface,borderRadius:20,padding:"18px 14px",border:`1px solid ${C.border}`,marginBottom:14},lbl:{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:2,textTransform:"uppercase",marginBottom:14,paddingLeft:4}};
@@ -360,11 +430,46 @@ export default function StrengthTab({ C, data, update, onBack }) {
   return (
     <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:"'Outfit',sans-serif"}}>
       <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,8,0.88)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)"}}>
-        <div style={{padding:"16px 20px 12px"}}>
-          {onBack && <button onClick={onBack} style={{fontSize:13,color:C.sky,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",fontWeight:600,padding:0,marginBottom:2,letterSpacing:1}}>&larr; ZURÜCK</button>}
-          <div style={{fontSize:26,fontWeight:800,letterSpacing:-1}}>Krafttraining</div>
+        <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            {onBack && <button onClick={onBack} style={{fontSize:13,color:C.sky,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",fontWeight:600,padding:0,marginBottom:2,letterSpacing:1}}>&larr; ZURÜCK</button>}
+            <div style={{fontSize:26,fontWeight:800,letterSpacing:-1}}>Krafttraining</div>
+          </div>
+          <button onClick={()=>setShowEqSettings(true)} style={{padding:"8px 14px",borderRadius:10,background:C.card,border:`1px solid ${C.border}`,color:C.muted,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4}}>Equipment</button>
         </div>
       </div>
+
+      {/* Equipment Settings */}
+      {showEqSettings && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(10px)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowEqSettings(false)}}>
+          <div style={{background:C.surface,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",animation:"slideUp 0.25s ease-out"}}>
+            <div style={{width:40,height:5,borderRadius:3,background:C.border,margin:"0 auto 16px"}}/>
+            <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Mein Equipment</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.4}}>Nur Übungen für dein verfügbares Equipment werden angezeigt.</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
+              {EQUIPMENT.map(eq => {
+                const on = userEquipment.includes(eq.id);
+                return (
+                  <button key={eq.id} onClick={()=>toggleEquipment(eq.id)} style={{
+                    padding:"14px 12px",borderRadius:14,textAlign:"left",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",
+                    background: on ? `${C.lime}14` : C.card, border: on ? `1.5px solid ${C.lime}40` : `1.5px solid ${C.border}`,
+                  }}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:700,color:on?C.text:C.dim}}>{eq.name}</div>
+                        <div style={{fontSize:11,color:on?C.lime:C.dim,fontWeight:600}}>{eq.icon}</div>
+                      </div>
+                      <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${on?C.lime:C.border}`,background:on?C.lime:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#000",fontSize:14,fontWeight:900}}>{on?"\u2713":""}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{fontSize:12,color:C.dim,marginBottom:12}}>{availableEx.length} von {EX.length} Übungen verfügbar</div>
+            <button onClick={()=>setShowEqSettings(false)} style={{width:"100%",padding:"14px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Fertig</button>
+          </div>
+        </div>
+      )}
 
       {/* ═══ WORKOUT SUMMARY ═══ */}
       {summary && (
@@ -511,7 +616,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
             const def = EX.find(e => e.id === ex.exerciseId);
             const mg = MG.find(m => m.id === def?.m);
             const prev = getPrev(ex.exerciseId);
-            const sug = prev ? suggestWeight(ex.exerciseId, prev.sets) : null;
+            const sug = prev ? suggestWeight(ex.exerciseId, prev.sets, [8,12], sLog, recMap[EX.find(e=>e.id===ex.exerciseId)?.m]||100) : null;
             return (
               <div key={ei} style={{background:C.surface,borderRadius:18,padding:"16px 16px 12px",border:`1px solid ${C.border}`,marginBottom:10,borderLeft:`4px solid ${mg?.color||C.muted}`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
