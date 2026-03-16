@@ -710,7 +710,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
 
   const upSet = (ei, si, k, v) => setActive(p => ({
     ...p, exercises: p.exercises.map((e, i) => i !== ei ? e : {
-      ...e, sets: e.sets.map((s, j) => j !== si ? s : { ...s, [k]: k === "done" ? !s.done : k === "type" ? v : +v })
+      ...e, sets: e.sets.map((s, j) => j !== si ? s : { ...s, [k]: k === "done" ? !s.done : k === "type" ? v : v })
     })
   }));
   const addSet = (ei) => setActive(p => { const ls = p.exercises[ei].sets.slice(-1)[0] || {weight:0,reps:10,type:"N",rpe:0}; return {...p,exercises:p.exercises.map((e,i)=>i!==ei?e:{...e,sets:[...e.sets,{weight:ls.weight,reps:ls.reps,done:false,type:"N",rpe:0}]})}; });
@@ -748,7 +748,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
       ...active, duration,
       exercises: active.exercises.map(e => ({
         exerciseId: e.exerciseId,
-        sets: e.sets.filter(s => s.done).map(s => ({ weight: s.weight, reps: s.reps, type: s.type || "N", rpe: s.rpe || 0 })),
+        sets: e.sets.filter(s => s.done).map(s => ({ weight: +s.weight||0, reps: +s.reps||0, type: s.type || "N", rpe: +s.rpe || 0 })),
         ...(e.sessionNote?.trim() ? { sessionNote: e.sessionNote.trim() } : {}),
       })).filter(e => e.sets.length > 0),
     };
@@ -775,7 +775,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
     setSummary(summaryData);
   };
 
-  const saveTmpl = () => { if (!active || !tmplName.trim()) return; save(undefined, [...templates, { id: Date.now().toString(), name: tmplName.trim(), exercises: active.exercises.map(e => ({ exerciseId: e.exerciseId, sets: e.sets.map(s => ({weight:s.weight,reps:s.reps,type:s.type||"N"})) })) }], undefined); setTmplName(""); };
+  const saveTmpl = () => { if (!active || !tmplName.trim()) return; save(undefined, [...templates, { id: Date.now().toString(), name: tmplName.trim(), exercises: active.exercises.map(e => ({ exerciseId: e.exerciseId, sets: e.sets.map(s => ({weight:+s.weight||0,reps:+s.reps||0,type:s.type||"N"})) })) }], undefined); setTmplName(""); };
   const delTmpl = (id) => save(undefined, templates.filter(t => t.id !== id), undefined);
   const applySplit = (key) => { const p = SPLIT_PRESETS[key]; if (!p) return; save(undefined, undefined, p.days.map(d => ({id:Date.now().toString()+Math.random(),name:d.name,exercises:[...d.exercises]}))); setShowSplits(false); };
   const addDay = () => save(undefined, undefined, [...trainingDays, {id:Date.now().toString(),name:"Neuer Tag",exercises:[]}]);
@@ -1109,10 +1109,10 @@ export default function StrengthTab({ C, data, update, onBack }) {
                     <div key={si} style={{display:"grid",gridTemplateColumns:"28px 42px 1fr 1fr 36px 40px 32px",gap:3,marginBottom:4,alignItems:"center"}}>
                       <div style={{fontSize:12,fontWeight:700,color:C.dim,textAlign:"center"}}>{si+1}</div>
                       <button onClick={()=>{const types=["N","W","D","F"];const ci=types.indexOf(set.type||"N");upSet(ei,si,"type",types[(ci+1)%4])}} style={{padding:"4px 2px",borderRadius:6,border:`1px solid ${st.color}40`,background:`${st.color}14`,color:st.color,fontSize:9,fontWeight:700,cursor:"pointer",fontFamily:"inherit",textAlign:"center"}}>{st.label}</button>
-                      <input type="number" value={set.weight} onChange={e=>upSet(ei,si,"weight",e.target.value)} style={{...inp,padding:"8px 4px",fontSize:14,fontWeight:700,background:set.done?`${C.lime}10`:C.card}}/>
-                      {!def?.timed && <input type="number" value={set.reps} onChange={e=>upSet(ei,si,"reps",e.target.value)} style={{...inp,padding:"8px 4px",fontSize:14,fontWeight:700,background:set.done?`${C.lime}10`:C.card}}/>}
+                      <input type="text" inputMode="decimal" pattern="[0-9]*\.?[0-9]*" value={set.weight} onChange={e=>{const v=e.target.value;if(v===""||/^\d*\.?\d*$/.test(v))upSet(ei,si,"weight",v)}} onBlur={e=>{const n=parseFloat(e.target.value);upSet(ei,si,"weight",isNaN(n)?0:n)}} style={{...inp,padding:"8px 4px",fontSize:14,fontWeight:700,background:set.done?`${C.lime}10`:C.card}}/>
+                      {!def?.timed && <input type="text" inputMode="numeric" pattern="[0-9]*" value={set.reps} onChange={e=>{const v=e.target.value;if(v===""||/^\d+$/.test(v))upSet(ei,si,"reps",v)}} onBlur={e=>{const n=parseInt(e.target.value,10);upSet(ei,si,"reps",isNaN(n)?0:n)}} style={{...inp,padding:"8px 4px",fontSize:14,fontWeight:700,background:set.done?`${C.lime}10`:C.card}}/>}
                       {def?.timed && <div/>}
-                      <input type="number" value={set.rpe||""} onChange={e=>upSet(ei,si,"rpe",e.target.value)} placeholder="-" min={1} max={10} style={{...inp,padding:"8px 2px",fontSize:12,fontWeight:600,color:C.muted}}/>
+                      <input type="text" inputMode="numeric" pattern="[0-9]*" value={set.rpe||""} onChange={e=>{const v=e.target.value;if(v===""||/^\d+$/.test(v)){const n=parseInt(v,10);if(v===""||n<=10)upSet(ei,si,"rpe",v)}}} onBlur={e=>{const n=parseInt(e.target.value,10);upSet(ei,si,"rpe",isNaN(n)?0:Math.min(10,n))}} placeholder="-" style={{...inp,padding:"8px 2px",fontSize:12,fontWeight:600,color:C.muted}}/>
                       <button onClick={()=>{upSet(ei,si,"done");if(!set.done)startRest(ex.exerciseId)}} style={{width:40,height:36,borderRadius:10,border:`1px solid ${set.done?C.lime+"40":C.border}`,cursor:"pointer",fontSize:16,background:set.done?C.limeBg:C.card,color:set.done?C.lime:C.dim,display:"flex",alignItems:"center",justifyContent:"center"}}>{set.done?"\u2713":""}</button>
                       <button onClick={()=>rmSet(ei,si)} style={{width:32,height:36,borderRadius:8,background:C.card,border:`1px solid ${C.border}`,color:C.dim,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
                     </div>
