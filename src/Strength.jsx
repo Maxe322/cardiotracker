@@ -58,6 +58,14 @@ const EX = [
   {id:"arnold_press",name:"Arnold Press",m:"shoulders",s:["triceps"],inc:2,eq:["db"]},
   {id:"shrugs_db",name:"Shrugs (KH)",m:"traps",s:["shoulders"],inc:5,eq:["db"]},
   {id:"shrugs_bb",name:"Shrugs (LH)",m:"traps",s:["shoulders"],inc:5,eq:["bb"]},
+  {id:"shrugs_smith",name:"Shrugs (Smith)",m:"traps",s:["shoulders"],inc:5,eq:["smith"]},
+  {id:"shrugs_machine",name:"Shrugs (Maschine)",m:"traps",s:["shoulders"],inc:5,eq:["machine"]},
+  {id:"neck_pull_cable",name:"Nackenziehen (Kabel)",m:"traps",s:[],inc:2.5,eq:["cable"]},
+  {id:"upright_row_db",name:"Aufrechtes Rudern (KH)",m:"traps",s:["shoulders"],inc:2,eq:["db"]},
+  {id:"upright_row_cable",name:"Aufrechtes Rudern (Kabel)",m:"traps",s:["shoulders"],inc:2.5,eq:["cable"]},
+  {id:"upright_row_ez",name:"Aufrechtes Rudern (SZ)",m:"traps",s:["shoulders"],inc:2.5,eq:["ez"]},
+  {id:"rack_pull",name:"Rack Pulls",m:"traps",s:["back","forearms"],inc:5,eq:["bb","rack"]},
+  {id:"prone_y_raise",name:"Y-Raises (liegend)",m:"traps",s:["shoulders"],inc:1,eq:["db","bench"]},
   {id:"curl_bb",name:"Langhantel-Curls",m:"biceps",s:[],inc:2.5,eq:["bb"]},
   {id:"curl_db",name:"KH-Curls",m:"biceps",s:[],inc:2,eq:["db"]},
   {id:"curl_ez",name:"SZ-Curls",m:"biceps",s:[],inc:2.5,eq:["ez"]},
@@ -229,7 +237,7 @@ const WARMUP_EXERCISE_IDS = new Set([
   "hip_thrust","glute_bridge",
   "close_grip_bench","skull_crush",
   "curl_bb","curl_ez",
-  "row_machine",
+  "row_machine","rack_pull","shrugs_bb","shrugs_smith",
 ]);
 
 function isWarmupRelevant(exerciseId) {
