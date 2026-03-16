@@ -528,7 +528,7 @@ export default function App(){
 
         {/* ═══ DASHBOARD ═══ */}
         {view==="dash"&&(
-          <div style={{animation:"fadeIn 0.35s ease"}}>
+          <div style={{}}>
             {!startDate&&(
               <div style={{background:`linear-gradient(135deg, ${C.emberBg}, ${C.surface})`,borderRadius:20,padding:"22px 20px",border:`1px solid ${C.ember}30`,marginBottom:18}}>
                 <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Plan starten</div>
@@ -637,7 +637,7 @@ export default function App(){
 
         {/* ═══ PLAN ═══ */}
         {view==="plan"&&(
-          <div style={{animation:"fadeIn 0.35s ease"}}>
+          <div style={{}}>
             <div style={{position:"relative",marginBottom:16}}>
               <div ref={pillRef} style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:10,WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
                 {PLAN.map(p=>{const d=doneCount(p.week),tot=p.sessions.length,isCur=currentPlanWeek===p.week;
@@ -659,7 +659,7 @@ export default function App(){
                 {curPlan.sessions.map((s,i)=>{
                   const t=TYPES.find(x=>x.id===s.type),done=isDone(curPlan.week,s.day);
                   return(
-                    <div key={i} onClick={()=>openSheet(curPlan.week,s)} style={{background:done?`${C.lime}08`:C.surface,borderRadius:18,padding:"20px 20px 16px",border:done?`1px solid ${C.lime}30`:`1px solid ${C.border}`,borderLeft:`4px solid ${done?C.lime:t?.color||C.muted}`,cursor:"pointer",transition:"all 0.15s",position:"relative",animation:`fadeUp 0.3s ease ${i*0.06}s both`}}>
+                    <div key={i} onClick={()=>openSheet(curPlan.week,s)} style={{background:done?`${C.lime}08`:C.surface,borderRadius:18,padding:"20px 20px 16px",border:done?`1px solid ${C.lime}30`:`1px solid ${C.border}`,borderLeft:`4px solid ${done?C.lime:t?.color||C.muted}`,cursor:"pointer",transition:"all 0.15s",position:"relative"}}>
                       {done&&(<div style={{position:"absolute",top:12,right:14,width:28,height:28,borderRadius:14,background:C.limeBg,border:`1.5px solid ${C.lime}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:C.lime,fontWeight:900}}>&#10003;</div>)}
                       <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:12}}>
                         <TI type={s.type} size={40}/>
@@ -699,7 +699,7 @@ export default function App(){
 
         {/* ═══ HISTORY ═══ */}
         {view==="history"&&(
-          <div style={{animation:"fadeIn 0.35s ease"}}>
+          <div style={{}}>
             {workouts.length===0?(
               <div style={{textAlign:"center",padding:"80px 20px"}}>
                 <div style={{width:80,height:80,borderRadius:24,background:C.emberBg,border:`1px solid ${C.ember}30`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",fontSize:32,fontWeight:900,color:C.ember}}>GO</div>
@@ -722,7 +722,7 @@ export default function App(){
                   const t=TYPES.find(x=>x.id===w.type)||TYPES[5];
                   const pace=w.distance>0?Math.round(w.duration/w.distance*10)/10:null;
                   return(
-                    <div key={w.id} style={{background:C.surface,borderRadius:16,padding:"14px 14px",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12,animation:`fadeUp 0.3s ease ${Math.min(idx*0.04,0.4)}s both`}}>
+                    <div key={w.id} style={{background:C.surface,borderRadius:16,padding:"14px 14px",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12}}>
                       <TI type={w.type} size={42}/>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
@@ -752,7 +752,7 @@ export default function App(){
 
         {/* ═══ BADGES / ERFOLGE ═══ */}
         {view==="badges"&&(
-          <div style={{animation:"fadeIn 0.35s ease"}}>
+          <div style={{}}>
             {/* PRs */}
             <div style={{...sty.card,marginBottom:18}}>
               <div style={sty.label}>PERSONAL RECORDS</div>
