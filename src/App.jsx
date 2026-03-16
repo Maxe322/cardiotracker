@@ -6,14 +6,16 @@ import {
 import StrengthSection from "./Strength";
 
 const C = {
-  bg: "#0A0A08", surface: "#141412", card: "#1C1C19", elevated: "#242420",
-  border: "#2A2A26", borderLight: "#363630",
-  text: "#F2EDE7", sub: "rgba(242,237,231,0.72)", muted: "rgba(242,237,231,0.44)", dim: "rgba(242,237,231,0.2)",
-  ember: "#E8553A", emberBg: "rgba(232,85,58,0.12)",
-  sky: "#4AABDD", skyBg: "rgba(74,171,221,0.12)",
-  gold: "#D4A024", goldBg: "rgba(212,160,36,0.12)",
-  lime: "#8BC34A", limeBg: "rgba(139,195,74,0.12)",
-  violet: "#9C7BF2", violetBg: "rgba(156,123,242,0.12)",
+  bg: "#0a0a0f", surface: "rgba(18,18,26,0.85)", card: "rgba(24,24,35,0.7)", elevated: "rgba(30,30,42,0.9)",
+  border: "rgba(255,255,255,0.06)", borderLight: "rgba(255,255,255,0.1)",
+  text: "#e8e4df", sub: "#b5b0a8", muted: "#7a756d", dim: "#4a4640",
+  ember: "#c4956a", emberBg: "rgba(196,149,106,0.1)",
+  sky: "#8ba4b8", skyBg: "rgba(139,164,184,0.08)",
+  gold: "#c4956a", goldBg: "rgba(196,149,106,0.08)",
+  lime: "#a8b87c", limeBg: "rgba(168,184,124,0.1)",
+  violet: "#9b8fb8", violetBg: "rgba(155,143,184,0.08)",
+  accentGlow: "rgba(196,149,106,0.06)",
+  accentBorder: "rgba(196,149,106,0.25)",
 };
 
 const TYPES = [
@@ -326,15 +328,29 @@ export default function App(){
 
   const inp={width:"100%",padding:"13px 16px",background:C.card,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:15,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box"};
   const sty = { card: {background:C.surface,borderRadius:20,padding:"18px 14px",border:`1px solid ${C.border}`,marginBottom:14}, label: {fontSize:11,fontWeight:700,color:C.muted,letterSpacing:2,textTransform:"uppercase",marginBottom:14,paddingLeft:4} };
-  const globalStyles = `@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes pop{0%{transform:scale(.95);opacity:0}100%{transform:scale(1);opacity:1}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes glow{0%,100%{box-shadow:0 0 8px ${C.gold}44}50%{box-shadow:0 0 24px ${C.gold}88}}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}input[type=range]{accent-color:${C.ember}}::-webkit-scrollbar{width:0;height:0}`;
+  const globalStyles = `@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes pop{0%{transform:scale(.95);opacity:0}100%{transform:scale(1);opacity:1}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes glow{0%,100%{box-shadow:0 0 20px rgba(196,149,106,0.05)}50%{box-shadow:0 0 40px rgba(196,149,106,0.12)}}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}input[type=range]{accent-color:${C.ember}}::-webkit-scrollbar{width:0;height:0}body{background:#0a0a0f}`;
+  const fontLink = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap";
+  const headFont = "'Cormorant Garamond',serif";
+  const bodyFont = "'Manrope',sans-serif";
+
+  const bgLayers = (
+    <>
+      <div style={{position:"fixed",inset:0,zIndex:0,background:`radial-gradient(ellipse at 50% 30%, rgba(196,149,106,0.04) 0%, transparent 60%),radial-gradient(ellipse at 20% 80%, rgba(139,164,184,0.03) 0%, transparent 50%),linear-gradient(180deg, #0a0a0f 0%, #0d0d14 50%, #0a0a0f 100%)`,pointerEvents:"none"}}/>
+      <div style={{position:"fixed",inset:0,zIndex:0,opacity:0.015,backgroundImage:`linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,backgroundSize:"60px 60px",pointerEvents:"none"}}/>
+      <div style={{position:"fixed",inset:0,zIndex:0,background:"radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%)",pointerEvents:"none"}}/>
+    </>
+  );
 
   // ═══ STRENGTH MODE — Full takeover ═══
   if (mode === "strength") {
     return (
-      <div style={{fontFamily:"'Outfit',sans-serif"}}>
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+      <div style={{fontFamily:bodyFont}}>
+        <link href={fontLink} rel="stylesheet"/>
         <style>{globalStyles}</style>
-        <StrengthSection C={C} data={data} update={update} onBack={()=>setMode(null)} />
+        {bgLayers}
+        <div style={{position:"relative",zIndex:1}}>
+          <StrengthSection C={C} data={data} update={update} onBack={()=>setMode(null)} />
+        </div>
       </div>
     );
   }
@@ -342,33 +358,36 @@ export default function App(){
   // ═══ MODE SELECTOR ═══
   if (mode === null) {
     return (
-      <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:"'Outfit',sans-serif",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"40px 24px"}}>
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+      <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:bodyFont,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"40px 24px",position:"relative",overflow:"hidden"}}>
+        <link href={fontLink} rel="stylesheet"/>
         <style>{globalStyles}</style>
-        <div style={{fontSize:13,fontWeight:600,color:C.ember,letterSpacing:3,textTransform:"uppercase",marginBottom:8,animation:"fadeIn 0.4s ease"}}>FITNESS TRACKER</div>
-        <div style={{fontSize:34,fontWeight:900,letterSpacing:-1.5,marginBottom:6,animation:"fadeUp 0.5s ease"}}>Was trainierst du?</div>
-        <div style={{fontSize:14,color:C.muted,marginBottom:40,animation:"fadeUp 0.5s ease 0.1s both"}}>Wähle deinen Trainingsbereich</div>
+        {bgLayers}
+        <div style={{position:"relative",zIndex:1,textAlign:"center",width:"100%",maxWidth:360}}>
+          <div style={{fontSize:10,fontWeight:600,color:C.ember,letterSpacing:5,textTransform:"uppercase",marginBottom:12,animation:"fadeIn 0.4s ease",fontFamily:bodyFont}}>PERFORMANCE TRACKER</div>
+          <div style={{fontSize:38,fontWeight:300,letterSpacing:6,marginBottom:8,animation:"fadeUp 0.5s ease",fontFamily:headFont,textTransform:"uppercase",lineHeight:1}}>Was trainierst du?</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:44,animation:"fadeUp 0.5s ease 0.1s both",letterSpacing:1}}>Wähle deinen Trainingsbereich</div>
 
-        <div style={{display:"flex",flexDirection:"column",gap:14,width:"100%",maxWidth:360}}>
-          <button onClick={()=>setMode("cardio")} style={{
-            background:`linear-gradient(135deg, ${C.emberBg}, ${C.surface})`,border:`1.5px solid ${C.ember}30`,
-            borderRadius:22,padding:"28px 24px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-            animation:"fadeUp 0.4s ease 0.15s both",transition:"transform 0.15s",
-          }}>
-            <div style={{fontSize:13,fontWeight:800,color:C.ember,letterSpacing:2,marginBottom:4}}>CARDIO</div>
-            <div style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:6}}>Ausdauertraining</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.4}}>10-Wochen Laufplan, Zone 2, Intervalle, Workouts tracken</div>
-          </button>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <button onClick={()=>setMode("cardio")} style={{
+              background:C.surface,border:`1px solid ${C.border}`,backdropFilter:"blur(20px)",
+              borderRadius:20,padding:"28px 24px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+              animation:"fadeUp 0.4s ease 0.15s both",transition:"transform 0.15s",
+            }}>
+              <div style={{fontSize:10,fontWeight:700,color:C.ember,letterSpacing:4,marginBottom:6,fontFamily:bodyFont}}>CARDIO</div>
+              <div style={{fontSize:22,fontWeight:300,color:C.text,marginBottom:6,fontFamily:headFont,letterSpacing:2,textTransform:"uppercase"}}>Ausdauer</div>
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>10-Wochen Laufplan, Zone 2, Intervalle</div>
+            </button>
 
-          <button onClick={()=>setMode("strength")} style={{
-            background:`linear-gradient(135deg, ${C.skyBg}, ${C.surface})`,border:`1.5px solid ${C.sky}30`,
-            borderRadius:22,padding:"28px 24px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-            animation:"fadeUp 0.4s ease 0.25s both",transition:"transform 0.15s",
-          }}>
-            <div style={{fontSize:13,fontWeight:800,color:C.sky,letterSpacing:2,marginBottom:4}}>KRAFT</div>
-            <div style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:6}}>Krafttraining</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.4}}>Übungen loggen, Progressive Overload, Split-Tage, Recovery</div>
-          </button>
+            <button onClick={()=>setMode("strength")} style={{
+              background:C.surface,border:`1px solid ${C.border}`,backdropFilter:"blur(20px)",
+              borderRadius:20,padding:"28px 24px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
+              animation:"fadeUp 0.4s ease 0.25s both",transition:"transform 0.15s",
+            }}>
+              <div style={{fontSize:10,fontWeight:700,color:C.sky,letterSpacing:4,marginBottom:6,fontFamily:bodyFont}}>KRAFT</div>
+              <div style={{fontSize:22,fontWeight:300,color:C.text,marginBottom:6,fontFamily:headFont,letterSpacing:2,textTransform:"uppercase"}}>Krafttraining</div>
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>Progressive Overload, Split-Tage, Recovery</div>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -376,18 +395,19 @@ export default function App(){
 
   // ═══ CARDIO MODE ═══
   return(
-    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:"'Outfit',sans-serif"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:bodyFont,position:"relative",overflow:"hidden"}}>
+      <link href={fontLink} rel="stylesheet"/>
       <style>{globalStyles}</style>
+      {bgLayers}
 
       {/* HEADER */}
-      <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,8,0.88)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)"}}>
+      <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,15,0.8)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)"}}>
         <div style={{padding:"16px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
-            <button onClick={()=>setMode(null)} style={{fontSize:13,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",fontWeight:600,padding:0,marginBottom:2,letterSpacing:1}}>&larr; ZURÜCK</button>
-            <div style={{fontSize:26,fontWeight:800,letterSpacing:-1}}>Cardio</div>
+            <button onClick={()=>setMode(null)} style={{fontSize:11,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:bodyFont,fontWeight:600,padding:0,marginBottom:4,letterSpacing:3,textTransform:"uppercase"}}>&larr; ZURÜCK</button>
+            <div style={{fontSize:28,fontWeight:300,letterSpacing:6,fontFamily:headFont,textTransform:"uppercase"}}>Cardio</div>
           </div>
-          <button onClick={()=>{closeModal();setModal(true)}} style={{width:44,height:44,borderRadius:14,background:C.ember,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,color:"#fff",fontWeight:300,lineHeight:1,boxShadow:`0 4px 20px ${C.ember}44`}}>+</button>
+          <button onClick={()=>{closeModal();setModal(true)}} style={{width:44,height:44,borderRadius:14,background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:"#0a0a0f",fontWeight:300,lineHeight:1,boxShadow:`0 4px 20px rgba(196,149,106,0.2)`}}>+</button>
         </div>
         <div style={{display:"flex",gap:0,padding:"14px 20px 0"}}>
           {[["dash","Übersicht"],["plan","Programm"],["history","Verlauf"],["badges","Erfolge"]].map(([k,l])=>(

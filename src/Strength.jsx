@@ -2,18 +2,18 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 
 const MG = [
-  { id:"chest", name:"Brust", color:"#E8553A" },
-  { id:"back", name:"Rücken", color:"#4AABDD" },
-  { id:"shoulders", name:"Schultern", color:"#D4A024" },
-  { id:"biceps", name:"Bizeps", color:"#8BC34A" },
-  { id:"triceps", name:"Trizeps", color:"#9C7BF2" },
-  { id:"quads", name:"Quadrizeps", color:"#E05880" },
-  { id:"hams", name:"Beinbeuger", color:"#FF9F0A" },
-  { id:"glutes", name:"Glutes", color:"#64D2FF" },
-  { id:"calves", name:"Waden", color:"#BF5AF2" },
-  { id:"core", name:"Core", color:"#FF375F" },
-  { id:"forearms", name:"Unterarme", color:"#AC8E68" },
-  { id:"traps", name:"Trapez", color:"#30D158" },
+  { id:"chest", name:"Brust", color:"#c4956a" },
+  { id:"back", name:"Rücken", color:"#8ba4b8" },
+  { id:"shoulders", name:"Schultern", color:"#c4956a" },
+  { id:"biceps", name:"Bizeps", color:"#a8b87c" },
+  { id:"triceps", name:"Trizeps", color:"#9b8fb8" },
+  { id:"quads", name:"Quadrizeps", color:"#c4956a" },
+  { id:"hams", name:"Beinbeuger", color:"#c4956a" },
+  { id:"glutes", name:"Glutes", color:"#8ba4b8" },
+  { id:"calves", name:"Waden", color:"#9b8fb8" },
+  { id:"core", name:"Core", color:"#c4956a" },
+  { id:"forearms", name:"Unterarme", color:"#a8b87c" },
+  { id:"traps", name:"Trapez", color:"#8ba4b8" },
 ];
 
 const EX = [
@@ -799,50 +799,50 @@ export default function StrengthTab({ C, data, update, onBack }) {
     return list;
   }, [exFilter, searchQ, availableEx]);
 
-  const inp = {width:"100%",padding:"11px 14px",background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:14,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",textAlign:"center"};
-  const sty = {card:{background:C.surface,borderRadius:20,padding:"18px 14px",border:`1px solid ${C.border}`,marginBottom:14},lbl:{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:2,textTransform:"uppercase",marginBottom:14,paddingLeft:4}};
+  const inp = {width:"100%",padding:"11px 14px",background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:14,fontFamily:"'Manrope',sans-serif",outline:"none",boxSizing:"border-box",textAlign:"center"};
+  const sty = {card:{background:C.surface,borderRadius:20,padding:"18px 14px",border:`1px solid ${C.border}`,marginBottom:14,backdropFilter:"blur(20px)"},lbl:{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:4,textTransform:"uppercase",marginBottom:14,paddingLeft:4,fontFamily:"'Manrope',sans-serif"}};
   const fmtT = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
   return (
-    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:"'Outfit',sans-serif"}}>
-      <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,8,0.88)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)"}}>
-        <div style={{padding:"16px 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+    <div style={{background:"transparent",minHeight:"100vh",color:C.text,fontFamily:"'Manrope',sans-serif"}}>
+      <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,15,0.8)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)"}}>
+        <div style={{padding:"20px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
-            {onBack && <button onClick={onBack} style={{fontSize:13,color:C.sky,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",fontWeight:600,padding:0,marginBottom:2,letterSpacing:1}}>&larr; ZURÜCK</button>}
-            <div style={{fontSize:26,fontWeight:800,letterSpacing:-1}}>Krafttraining</div>
+            {onBack && <button onClick={onBack} style={{fontSize:11,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:"'Manrope',sans-serif",fontWeight:600,padding:0,marginBottom:4,letterSpacing:3,textTransform:"uppercase"}}>&larr; ZURÜCK</button>}
+            <div style={{fontSize:32,fontWeight:300,letterSpacing:8,fontFamily:"'Cormorant Garamond',serif",textTransform:"uppercase",lineHeight:1}}>KRAFT</div>
           </div>
-          <button onClick={()=>setShowEqSettings(true)} style={{padding:"8px 14px",borderRadius:10,background:C.card,border:`1px solid ${C.border}`,color:C.muted,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4}}>Equipment</button>
+          <button onClick={()=>setShowEqSettings(true)} style={{padding:"8px 16px",borderRadius:24,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,color:C.muted,fontSize:10,fontWeight:500,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2,textTransform:"uppercase",backdropFilter:"blur(10px)",marginTop:4}}>Equipment</button>
         </div>
       </div>
 
       {/* Equipment Settings */}
       {showEqSettings && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(10px)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowEqSettings(false)}}>
-          <div style={{background:C.surface,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",animation:"slideUp 0.25s ease-out"}}>
-            <div style={{width:40,height:5,borderRadius:3,background:C.border,margin:"0 auto 16px"}}/>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:6}}>Mein Equipment</div>
-            <div style={{fontSize:13,color:C.muted,marginBottom:16,lineHeight:1.4}}>Nur Übungen für dein verfügbares Equipment werden angezeigt.</div>
+          <div style={{background:C.elevated,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",animation:"slideUp 0.25s ease-out"}}>
+            <div style={{width:40,height:5,borderRadius:3,background:C.borderLight,margin:"0 auto 16px"}}/>
+            <div style={{fontSize:18,fontWeight:700,marginBottom:6}}>Mein Equipment</div>
+            <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.4}}>Nur Übungen für dein verfügbares Equipment werden angezeigt.</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
               {EQUIPMENT.map(eq => {
                 const on = userEquipment.includes(eq.id);
                 return (
                   <button key={eq.id} onClick={()=>toggleEquipment(eq.id)} style={{
                     padding:"14px 12px",borderRadius:14,textAlign:"left",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",
-                    background: on ? `${C.lime}14` : C.card, border: on ? `1.5px solid ${C.lime}40` : `1.5px solid ${C.border}`,
+                    background: on ? `${C.lime}14` : C.card, border: on ? `1px solid ${C.lime}33` : `1px solid ${C.border}`,
                   }}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <div>
-                        <div style={{fontSize:14,fontWeight:700,color:on?C.text:C.dim}}>{eq.name}</div>
-                        <div style={{fontSize:11,color:on?C.lime:C.dim,fontWeight:600}}>{eq.icon}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:on?C.text:C.dim}}>{eq.name}</div>
+                        <div style={{fontSize:10,color:on?C.lime:C.dim,fontWeight:600,letterSpacing:1}}>{eq.icon}</div>
                       </div>
-                      <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${on?C.lime:C.border}`,background:on?C.lime:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#000",fontSize:14,fontWeight:900}}>{on?"\u2713":""}</div>
+                      <div style={{width:20,height:20,borderRadius:6,border:`2px solid ${on?C.lime:C.border}`,background:on?C.lime:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#0a0a0f",fontSize:12,fontWeight:900}}>{on?"\u2713":""}</div>
                     </div>
                   </button>
                 );
               })}
             </div>
-            <div style={{fontSize:12,color:C.dim,marginBottom:12}}>{availableEx.length} von {EX.length} Übungen verfügbar</div>
-            <button onClick={()=>setShowEqSettings(false)} style={{width:"100%",padding:"14px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Fertig</button>
+            <div style={{fontSize:11,color:C.dim,marginBottom:12,letterSpacing:1}}>{availableEx.length} von {EX.length} Übungen verfügbar</div>
+            <button onClick={()=>setShowEqSettings(false)} style={{width:"100%",padding:"14px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase"}}>Fertig</button>
           </div>
         </div>
       )}
@@ -962,9 +962,9 @@ export default function StrengthTab({ C, data, update, onBack }) {
       )}
 
     <div style={{padding:"22px 20px 48px",animation:"fadeIn 0.35s ease"}}>
-      <div style={{display:"flex",gap:6,marginBottom:18}}>
+      <div style={{display:"flex",gap:0,marginBottom:20,borderBottom:`1px solid ${C.border}`}}>
         {[["log","Workout"],["days","Tage"],["history","Verlauf"],["muscles","Muskeln"]].map(([k,l])=>(
-          <button key={k} onClick={()=>setSub(k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:sub===k?`1.5px solid ${C.ember}`:`1.5px solid ${C.border}`,background:sub===k?C.emberBg:C.surface,color:sub===k?C.ember:C.muted,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{l}</button>
+          <button key={k} onClick={()=>setSub(k)} style={{flex:1,padding:"12px 0 10px",background:"transparent",border:"none",borderBottom:sub===k?`2px solid ${C.ember}`:"2px solid transparent",color:sub===k?C.text:C.dim,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2.5,textTransform:"uppercase",transition:"all 0.3s"}}>{l}</button>
         ))}
       </div>
 
@@ -984,7 +984,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
               </div>
             </div>
           )}
-          <button onClick={()=>startWorkout(null)} style={{width:"100%",padding:"16px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${C.ember}44`,marginBottom:10}}>Leeres Workout starten</button>
+          <button onClick={()=>startWorkout(null)} style={{width:"100%",padding:"18px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:16,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:3,textTransform:"uppercase",boxShadow:`0 8px 32px rgba(196,149,106,0.2)`,marginBottom:10}}>Leeres Workout starten</button>
           {templates.length > 0 && (
             <>
               <button onClick={()=>setShowTmpl(p=>!p)} style={{width:"100%",padding:"14px 0",background:C.card,color:C.sub,border:`1px solid ${C.border}`,borderRadius:14,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>Aus Vorlage ({templates.length})</button>
@@ -1114,7 +1114,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
           })}
 
           <button onClick={()=>setPicker(true)} style={{width:"100%",padding:"14px 0",background:C.surface,border:`1.5px dashed ${C.border}`,borderRadius:14,color:C.muted,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:10}}>+ Übung</button>
-          <button onClick={finish} style={{width:"100%",padding:"15px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${C.ember}44`,marginBottom:8}}>Workout beenden</button>
+          <button onClick={finish} style={{width:"100%",padding:"16px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:3,textTransform:"uppercase",boxShadow:`0 8px 32px rgba(196,149,106,0.2)`,marginBottom:8}}>Workout beenden</button>
           <div style={{display:"flex",gap:8,marginBottom:8}}>
             <input value={tmplName} onChange={e=>setTmplName(e.target.value)} placeholder="Als Vorlage speichern..." style={{...inp,textAlign:"left",flex:1,borderRadius:14}}/>
             <button onClick={saveTmpl} disabled={!tmplName.trim()} style={{padding:"0 18px",background:tmplName.trim()?C.card:C.bg,border:`1px solid ${C.border}`,borderRadius:14,color:tmplName.trim()?C.sub:C.dim,fontSize:13,fontWeight:600,cursor:tmplName.trim()?"pointer":"default",fontFamily:"inherit"}}>Save</button>
@@ -1245,25 +1245,39 @@ export default function StrengthTab({ C, data, update, onBack }) {
       {/* ═══ MUSCLES ═══ */}
       {sub==="muscles" && (
         <div>
-          <div style={sty.card}>
+          {/* Statue hero */}
+          <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",padding:"24px 0 10px"}}>
+            <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:280,height:320,background:"radial-gradient(ellipse, rgba(196,149,106,0.06) 0%, transparent 70%)",filter:"blur(40px)",animation:"glow 6s ease-in-out infinite"}}/>
+            <div style={{position:"absolute",top:"20%",left:"50%",transform:"translateX(-50%)",width:180,height:220,opacity:0.05,backgroundImage:`linear-gradient(rgba(196,149,106,0.5) 1px, transparent 1px),linear-gradient(90deg, rgba(196,149,106,0.5) 1px, transparent 1px)`,backgroundSize:"18px 18px",borderRadius:16}}/>
             <div style={sty.lbl}>MUSKEL-RECOVERY</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {MG.map(m=>{const r=recMap[m.id]||0;const col=r>=80?C.lime:r>=50?C.gold:C.ember;
-                return(<div key={m.id} style={{background:C.card,borderRadius:14,padding:"12px 14px",border:`1px solid ${C.border}`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:13,fontWeight:700}}>{m.name}</span><span style={{fontSize:13,fontWeight:800,color:col}}>{r}%</span></div>
-                  <div style={{height:6,background:C.bg,borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${r}%`,background:col,borderRadius:3,transition:"width 0.5s ease"}}/></div>
-                </div>);
-              })}
+            <div style={{width:140,height:180,borderRadius:16,overflow:"hidden",position:"relative",boxShadow:"0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(196,149,106,0.04)"}}>
+              <img src="https://images.unsplash.com/photo-1618403088890-3d9ff6f4c8b4?w=400&q=80" alt="" style={{width:"100%",height:"100%",objectFit:"cover",filter:"grayscale(0.3) contrast(1.1) brightness(0.95)"}} onError={e=>{e.target.style.display="none"}}/>
+              <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg, rgba(196,149,106,0.08) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.4) 100%)",borderRadius:16}}/>
+              <div style={{position:"absolute",inset:0,border:`1px solid rgba(255,255,255,0.08)`,borderRadius:16}}/>
             </div>
           </div>
-          <div style={sty.card}>
-            <div style={sty.lbl}>VOLUMEN LETZTE 7 TAGE (ohne Warmup)</div>
+
+          {/* Recovery cards */}
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
+            {MG.map(m=>{const r=recMap[m.id]||0;const col=r>=80?C.lime:r>=50?C.gold:C.ember;
+              return(<div key={m.id} style={{background:C.surface,borderRadius:16,padding:"14px 18px",border:`1px solid ${C.border}`,backdropFilter:"blur(20px)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <span style={{fontSize:11,fontWeight:700,letterSpacing:2.5,textTransform:"uppercase"}}>{m.name}</span>
+                  <span style={{fontSize:14,fontWeight:700,color:col,fontVariantNumeric:"tabular-nums"}}>{r}%</span>
+                </div>
+                <div style={{height:3,background:"rgba(255,255,255,0.04)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${r}%`,background:`linear-gradient(90deg, ${col}88, ${col})`,borderRadius:2,transition:"width 1s ease",boxShadow:`0 0 8px ${col}33`}}/></div>
+              </div>);
+            })}
+          </div>
+
+          <div style={{...sty.card,marginTop:16}}>
+            <div style={sty.lbl}>VOLUMEN LETZTE 7 TAGE</div>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={MG.filter(m=>weekVol[m.id]>0).map(m=>({name:m.name,vol:Math.round(weekVol[m.id]),fill:m.color}))} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke={C.border} horizontal={false}/>
                 <XAxis type="number" tick={{fontSize:9,fill:C.dim}} axisLine={false} tickLine={false}/>
-                <YAxis type="category" dataKey="name" tick={{fontSize:11,fill:C.sub}} axisLine={false} tickLine={false} width={80}/>
-                <Tooltip contentStyle={{background:C.elevated,border:`1px solid ${C.borderLight}`,borderRadius:10,fontSize:12,color:C.text}} labelStyle={{color:C.muted}}/>
+                <YAxis type="category" dataKey="name" tick={{fontSize:10,fill:C.sub}} axisLine={false} tickLine={false} width={80}/>
+                <Tooltip contentStyle={{background:C.elevated,border:`1px solid ${C.borderLight}`,borderRadius:10,fontSize:12,fontFamily:"'Manrope',sans-serif",color:C.text}} labelStyle={{color:C.muted}}/>
                 <Bar dataKey="vol" name="Volumen (kg)" radius={[0,5,5,0]}>{MG.filter(m=>weekVol[m.id]>0).map((m,i)=><Cell key={i} fill={m.color}/>)}</Bar>
               </BarChart>
             </ResponsiveContainer>
