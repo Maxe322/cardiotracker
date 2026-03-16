@@ -611,6 +611,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const userEquipment = data.userEquipment || EQUIPMENT.map(e => e.id);
   const exerciseNotes = data.exerciseNotes || {}; // { [exerciseId]: "note text" }
   const [showEqSettings, setShowEqSettings] = useState(false);
+  const [showDataPanel, setShowDataPanel] = useState(false);
   const [editingNoteFor, setEditingNoteFor] = useState(null); // exerciseId being edited
   const [noteText, setNoteText] = useState("");
 
@@ -822,7 +823,10 @@ export default function StrengthTab({ C, data, update, onBack }) {
             {onBack && <button onClick={onBack} style={{fontSize:11,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:"'Manrope',sans-serif",fontWeight:600,padding:0,marginBottom:4,letterSpacing:3,textTransform:"uppercase"}}>&larr; ZURÜCK</button>}
             <div style={{fontSize:32,fontWeight:300,letterSpacing:8,fontFamily:"'Cormorant Garamond',serif",textTransform:"uppercase",lineHeight:1}}>KRAFT</div>
           </div>
-          <button onClick={()=>setShowEqSettings(true)} style={{padding:"8px 16px",borderRadius:24,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,color:C.muted,fontSize:10,fontWeight:500,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2,textTransform:"uppercase",backdropFilter:"blur(10px)",marginTop:4}}>Equipment</button>
+          <div style={{display:"flex",gap:6,marginTop:4}}>
+            <button onClick={()=>setShowDataPanel(true)} style={{padding:"8px 12px",borderRadius:24,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,color:C.muted,fontSize:10,fontWeight:500,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2,textTransform:"uppercase",backdropFilter:"blur(10px)"}}>Daten</button>
+            <button onClick={()=>setShowEqSettings(true)} style={{padding:"8px 12px",borderRadius:24,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,color:C.muted,fontSize:10,fontWeight:500,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2,textTransform:"uppercase",backdropFilter:"blur(10px)"}}>Equipment</button>
+          </div>
         </div>
       </div>
 
@@ -854,6 +858,92 @@ export default function StrengthTab({ C, data, update, onBack }) {
             </div>
             <div style={{fontSize:11,color:C.dim,marginBottom:12,letterSpacing:1}}>{availableEx.length} von {EX.length} Übungen verfügbar</div>
             <button onClick={()=>setShowEqSettings(false)} style={{width:"100%",padding:"14px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase"}}>Fertig</button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ DATA EXPORT/IMPORT PANEL ═══ */}
+      {showDataPanel && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(10px)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowDataPanel(false)}}>
+          <div style={{background:C.elevated,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",animation:"slideUp 0.25s ease-out",maxHeight:"80vh",overflowY:"auto"}}>
+            <div style={{width:40,height:5,borderRadius:3,background:C.borderLight,margin:"0 auto 16px"}}/>
+            <div style={{fontSize:18,fontWeight:700,marginBottom:6}}>Daten Export / Import</div>
+            <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.5}}>Übertrage deine Daten zwischen Browsern oder Geräten.</div>
+
+            {/* Export */}
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.sub,marginBottom:8}}>Export</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Kopiert alle Daten (Workouts, Templates, Splits, Equipment, Notizen) in die Zwischenablage.</div>
+              <button onClick={()=>{
+                try {
+                  const raw = localStorage.getItem("cardio-v4");
+                  if (!raw) { alert("Keine Daten gefunden."); return; }
+                  navigator.clipboard.writeText(raw).then(()=>alert("Daten kopiert! Füge sie im anderen Browser ein.")).catch(()=>{
+                    // Fallback: show in prompt
+                    prompt("Kopiere diesen Text:", raw);
+                  });
+                } catch(e) { alert("Fehler: " + e.message); }
+              }} style={{width:"100%",padding:"14px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase"}}>
+                Daten in Zwischenablage kopieren
+              </button>
+            </div>
+
+            {/* Import */}
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.sub,marginBottom:8}}>Import</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Füge die exportierten Daten hier ein. Wähle dann ob du zusammenführen oder ersetzen willst.</div>
+              <textarea id="data-import-field" placeholder="JSON-Daten hier einfügen..." style={{
+                width:"100%",minHeight:100,borderRadius:12,padding:12,fontFamily:"'Manrope',monospace",fontSize:11,
+                background:C.card,border:`1px solid ${C.border}`,color:C.text,resize:"vertical",outline:"none",
+              }}/>
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <button onClick={()=>{
+                  try {
+                    const raw = document.getElementById("data-import-field").value.trim();
+                    if (!raw) { alert("Kein Text eingefügt."); return; }
+                    const imported = JSON.parse(raw);
+                    if (!confirm("Daten ZUSAMMENFÜHREN? Workouts werden kombiniert, neuere Einstellungen überschreiben ältere.")) return;
+                    // Merge: combine logs, keep latest templates/days/equipment/notes
+                    const current = JSON.parse(localStorage.getItem("cardio-v4") || "{}");
+                    const mergeLog = (a=[], b=[]) => {
+                      const ids = new Set(a.map(w => w.id));
+                      return [...a, ...b.filter(w => !ids.has(w.id))].sort((x,y) => y.date?.localeCompare(x.date));
+                    };
+                    const merged = {
+                      workouts: mergeLog(current.workouts, imported.workouts),
+                      startDate: current.startDate || imported.startDate,
+                      strengthLog: mergeLog(current.strengthLog, imported.strengthLog),
+                      strengthTemplates: imported.strengthTemplates || current.strengthTemplates || [],
+                      trainingDays: current.trainingDays?.length ? current.trainingDays : (imported.trainingDays || []),
+                      userEquipment: current.userEquipment || imported.userEquipment,
+                      exerciseNotes: { ...(imported.exerciseNotes||{}), ...(current.exerciseNotes||{}) },
+                    };
+                    localStorage.setItem("cardio-v4", JSON.stringify(merged));
+                    localStorage.removeItem("cardio-activeWorkout");
+                    alert("Daten zusammengeführt! App wird neu geladen.");
+                    window.location.reload();
+                  } catch(e) { alert("Fehler beim Import: " + e.message); }
+                }} style={{flex:1,padding:"12px 0",background:C.card,color:C.lime,border:`1px solid ${C.lime}33`,borderRadius:12,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:1.5,textTransform:"uppercase"}}>
+                  Zusammenführen
+                </button>
+                <button onClick={()=>{
+                  try {
+                    const raw = document.getElementById("data-import-field").value.trim();
+                    if (!raw) { alert("Kein Text eingefügt."); return; }
+                    const imported = JSON.parse(raw);
+                    if (!confirm("ACHTUNG: Alle aktuellen Daten werden ÜBERSCHRIEBEN. Fortfahren?")) return;
+                    localStorage.setItem("cardio-v4", JSON.stringify(imported));
+                    localStorage.removeItem("cardio-activeWorkout");
+                    alert("Daten ersetzt! App wird neu geladen.");
+                    window.location.reload();
+                  } catch(e) { alert("Fehler beim Import: " + e.message); }
+                }} style={{flex:1,padding:"12px 0",background:C.card,color:"#c46a6a",border:"1px solid rgba(196,106,106,0.3)",borderRadius:12,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:1.5,textTransform:"uppercase"}}>
+                  Ersetzen
+                </button>
+              </div>
+            </div>
+
+            <button onClick={()=>setShowDataPanel(false)} style={{width:"100%",padding:"14px 0",background:"rgba(255,255,255,0.04)",color:C.muted,border:`1px solid ${C.border}`,borderRadius:14,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase"}}>Schließen</button>
           </div>
         </div>
       )}
