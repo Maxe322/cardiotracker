@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, AreaChart, Area, LineChart, Line
 } from "recharts";
+import StrengthTab from "./Strength";
 
 const C = {
   bg: "#0A0A08", surface: "#141412", card: "#1C1C19", elevated: "#242420",
@@ -126,7 +127,7 @@ function TI({type,size=36}){
 }
 
 export default function App(){
-  const [data, setData] = useState({ workouts:[], startDate:null });
+  const [data, setData] = useState({ workouts:[], startDate:null, strengthLog:[], strengthTemplates:[] });
   const [view, setView] = useState("dash");
   const [modal, setModal] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -348,7 +349,7 @@ export default function App(){
           <button onClick={()=>{closeModal();setModal(true)}} style={{width:44,height:44,borderRadius:14,background:C.ember,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,color:"#fff",fontWeight:300,lineHeight:1,boxShadow:`0 4px 20px ${C.ember}44`}}>+</button>
         </div>
         <div style={{display:"flex",gap:0,padding:"14px 20px 0"}}>
-          {[["dash","Übersicht"],["plan","Programm"],["history","Verlauf"],["badges","Erfolge"]].map(([k,l])=>(
+          {[["dash","Übersicht"],["plan","Programm"],["strength","Kraft"],["history","Verlauf"],["badges","Erfolge"]].map(([k,l])=>(
             <button key={k} onClick={()=>setView(k)} style={{padding:"8px 14px 12px",background:"transparent",border:"none",borderBottom:view===k?`2.5px solid ${C.ember}`:"2.5px solid transparent",color:view===k?C.text:C.muted,fontSize:13,fontWeight:view===k?700:400,cursor:"pointer",fontFamily:"inherit",transition:"all 0.2s"}}>{l}</button>
           ))}
         </div>
@@ -686,6 +687,11 @@ export default function App(){
               </div>
             </>)}
           </div>
+        )}
+
+        {/* ═══ STRENGTH ═══ */}
+        {view==="strength"&&(
+          <StrengthTab C={C} data={data} update={update} />
         )}
 
         {/* ═══ BADGES / ERFOLGE ═══ */}
