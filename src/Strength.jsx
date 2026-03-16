@@ -232,6 +232,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
 
   const startFromDay = (day) => {
     startWorkout({ exercises: day.exercises.map(eid => ({ exerciseId: eid })) });
+    setSub("log");
   };
 
   const addEx = (eid) => {
