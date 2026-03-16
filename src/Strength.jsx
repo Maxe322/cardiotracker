@@ -1611,6 +1611,117 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
             <div style={{textAlign:"center",padding:"60px 20px",color:C.dim,fontSize:14}}>Noch keine Kraft-Workouts</div>
           ) : (
             <>
+              {/* ═══ TRAINING CALENDAR — GitHub Contributions Style ═══ */}
+              <div style={sty.card}>
+                <div style={sty.lbl}>TRAININGSKALENDER</div>
+                {(() => {
+                  // Build 13 weeks (91 days) of data ending today
+                  const today = new Date();
+                  today.setHours(0,0,0,0);
+                  const WEEKS = 13;
+                  // Find the Monday of the earliest week
+                  const dayOfWeek = (today.getDay() + 6) % 7; // 0=Mon
+                  const endMon = new Date(today);
+                  endMon.setDate(today.getDate() - dayOfWeek);
+                  const startMon = new Date(endMon);
+                  startMon.setDate(endMon.getDate() - (WEEKS - 1) * 7);
+
+                  // Build lookup: date string → workout info
+                  const dayMap = {};
+                  sLog.forEach(w => {
+                    const d = w.date;
+                    if (!dayMap[d]) dayMap[d] = { muscles: new Set(), vol: 0, sessions: 0, exercises: 0 };
+                    dayMap[d].sessions++;
+                    (w.exercises || []).forEach(ex => {
+                      dayMap[d].exercises++;
+                      const def = EX.find(e => e.id === ex.exerciseId);
+                      if (def) { dayMap[d].muscles.add(def.m); }
+                      dayMap[d].vol += ex.sets.filter(s => s.type !== "W").reduce((a, s) => a + (+s.weight||0) * (+s.reps||0), 0);
+                    });
+                  });
+
+                  // Build grid: columns = weeks, rows = days (Mon-Sun)
+                  const weeks = [];
+                  for (let w = 0; w < WEEKS; w++) {
+                    const week = [];
+                    for (let d = 0; d < 7; d++) {
+                      const date = new Date(startMon);
+                      date.setDate(startMon.getDate() + w * 7 + d);
+                      const ds = date.toISOString().slice(0, 10);
+                      const isFuture = date > today;
+                      const info = dayMap[ds];
+                      week.push({ date: ds, day: date, info, isFuture });
+                    }
+                    weeks.push(week);
+                  }
+
+                  // Color for a day cell
+                  const cellColor = (info) => {
+                    if (!info) return "rgba(255,255,255,0.03)";
+                    const muscles = [...info.muscles];
+                    if (muscles.length === 0) return "rgba(255,255,255,0.03)";
+                    // Use the dominant muscle group's color
+                    const primary = muscles[0];
+                    const mg = MG.find(m => m.id === primary);
+                    const base = mg?.color || C.ember;
+                    // Intensity based on volume
+                    const opacity = info.vol > 8000 ? 0.7 : info.vol > 4000 ? 0.5 : info.vol > 1000 ? 0.35 : 0.2;
+                    return `${base}${Math.round(opacity * 255).toString(16).padStart(2, "0")}`;
+                  };
+
+                  const dayLabels = ["Mo","","Mi","","Fr","","So"];
+                  const SZ = 12; // cell size
+                  const GAP = 3;
+
+                  return (
+                    <div>
+                      <div style={{display:"flex",gap:2}}>
+                        {/* Day labels column */}
+                        <div style={{display:"flex",flexDirection:"column",gap:GAP,paddingTop:18}}>
+                          {dayLabels.map((l, i) => (
+                            <div key={i} style={{height:SZ,fontSize:8,color:C.dim,display:"flex",alignItems:"center",width:18,fontWeight:600}}>{l}</div>
+                          ))}
+                        </div>
+                        {/* Week columns */}
+                        <div style={{display:"flex",gap:GAP,flex:1,overflowX:"auto"}}>
+                          {weeks.map((week, wi) => (
+                            <div key={wi} style={{display:"flex",flexDirection:"column",gap:GAP}}>
+                              {/* Month label on first Monday of a month */}
+                              <div style={{height:14,fontSize:8,color:C.dim,fontWeight:600,display:"flex",alignItems:"flex-end"}}>
+                                {week[0].day.getDate() <= 7 ? new Date(week[0].date).toLocaleDateString("de-DE", {month:"short"}) : ""}
+                              </div>
+                              {week.map((cell, di) => {
+                                const isToday = cell.date === new Date().toISOString().slice(0,10);
+                                return (
+                                  <div key={di} title={cell.info ? `${cell.date}: ${cell.info.exercises} Üb., ${Math.round(cell.info.vol)}kg` : cell.date} style={{
+                                    width:SZ,height:SZ,borderRadius:2.5,
+                                    background: cell.isFuture ? "transparent" : cellColor(cell.info),
+                                    border: isToday ? `1.5px solid ${C.ember}` : cell.isFuture ? "none" : "1px solid rgba(255,255,255,0.02)",
+                                    cursor: cell.info ? "pointer" : "default",
+                                    transition: "background 0.3s",
+                                  }}/>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Legend */}
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10}}>
+                        <div style={{fontSize:9,color:C.dim}}>{sLog.length} Workouts gesamt</div>
+                        <div style={{display:"flex",alignItems:"center",gap:3}}>
+                          <span style={{fontSize:8,color:C.dim,marginRight:4}}>Wenig</span>
+                          {[0.08, 0.2, 0.35, 0.5, 0.7].map((op, i) => (
+                            <div key={i} style={{width:SZ,height:SZ,borderRadius:2.5,background:`${C.ember}${Math.round(op * 255).toString(16).padStart(2,"0")}`}}/>
+                          ))}
+                          <span style={{fontSize:8,color:C.dim,marginLeft:4}}>Viel</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
               {/* Exercise selector with tap-to-detail */}
               <div style={sty.card}>
                 <div style={sty.lbl}>ÜBUNGSFORTSCHRITT</div>
