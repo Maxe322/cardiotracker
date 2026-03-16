@@ -17,114 +17,140 @@ const MG = [
 ];
 
 const EX = [
-  // Chest
+  // ═══ CHEST ═══
   { id:"bench_bb", name:"Bankdrücken (LH)", m:"chest", s:["triceps","shoulders"], inc:2.5 },
   { id:"bench_db", name:"Bankdrücken (KH)", m:"chest", s:["triceps","shoulders"], inc:2 },
-  { id:"incline_bb", name:"Schrägbank (LH)", m:"chest", s:["shoulders","triceps"], inc:2.5 },
-  { id:"incline_db", name:"Schrägbank (KH)", m:"chest", s:["shoulders","triceps"], inc:2 },
+  { id:"incline_bb", name:"Schrägbankdrücken (LH)", m:"chest", s:["shoulders","triceps"], inc:2.5 },
+  { id:"incline_db", name:"Schrägbankdrücken (KH)", m:"chest", s:["shoulders","triceps"], inc:2 },
   { id:"decline_bb", name:"Decline Bench (LH)", m:"chest", s:["triceps"], inc:2.5 },
+  { id:"chest_press_machine", name:"Brustpresse (Maschine)", m:"chest", s:["triceps","shoulders"], inc:2.5 },
   { id:"chest_fly_db", name:"Flys (KH)", m:"chest", s:[], inc:2 },
   { id:"chest_fly_cable", name:"Cable Flys", m:"chest", s:[], inc:2.5 },
+  { id:"chest_fly_machine", name:"Butterfly (Maschine)", m:"chest", s:[], inc:2.5 },
   { id:"pec_deck", name:"Pec Deck", m:"chest", s:[], inc:2.5 },
   { id:"dips", name:"Dips", m:"chest", s:["triceps","shoulders"], inc:5, bw:true },
   { id:"pushup", name:"Liegestütze", m:"chest", s:["triceps"], inc:0, bw:true },
-  // Back
+  // ═══ BACK ═══
   { id:"deadlift", name:"Kreuzheben", m:"back", s:["hams","glutes","core","traps"], inc:2.5 },
   { id:"row_bb", name:"Langhantelrudern", m:"back", s:["biceps","traps"], inc:2.5 },
   { id:"row_db", name:"KH-Rudern einarmig", m:"back", s:["biceps"], inc:2 },
+  { id:"row_machine", name:"Rudern (Maschine eng)", m:"back", s:["biceps"], inc:2.5 },
+  { id:"row_machine_single", name:"Rudern einarmig (Maschine)", m:"back", s:["biceps"], inc:2.5 },
   { id:"pullup", name:"Klimmzüge", m:"back", s:["biceps"], inc:0, bw:true },
   { id:"chinup", name:"Chin-Ups", m:"back", s:["biceps"], inc:0, bw:true },
-  { id:"lat_pull", name:"Latzug", m:"back", s:["biceps"], inc:2.5 },
+  { id:"lat_pull_wide", name:"Latzug breit", m:"back", s:["biceps"], inc:2.5 },
   { id:"lat_pull_close", name:"Latzug eng", m:"back", s:["biceps"], inc:2.5 },
   { id:"cable_row", name:"Kabelrudern sitzend", m:"back", s:["biceps","traps"], inc:2.5 },
   { id:"tbar_row", name:"T-Bar Rudern", m:"back", s:["biceps","traps"], inc:2.5 },
   { id:"pullover", name:"Pullover", m:"back", s:["chest"], inc:2 },
   { id:"hyperext", name:"Hyperextensions", m:"back", s:["glutes","hams"], inc:5, bw:true },
-  // Shoulders
+  // ═══ SHOULDERS ═══
+  { id:"ohp_smith", name:"Schulterdrücken (Smith Machine)", m:"shoulders", s:["triceps","traps"], inc:2.5 },
   { id:"ohp_bb", name:"Schulterdrücken (LH)", m:"shoulders", s:["triceps","traps"], inc:2.5 },
-  { id:"ohp_db", name:"Schulterdrücken (KH)", m:"shoulders", s:["triceps"], inc:2 },
-  { id:"lat_raise", name:"Seitheben", m:"shoulders", s:[], inc:1 },
+  { id:"ohp_db", name:"Schulterdrücken (KH) sitzend", m:"shoulders", s:["triceps"], inc:2 },
+  { id:"ohp_machine", name:"Schulterdrücken (Maschine)", m:"shoulders", s:["triceps"], inc:2.5 },
+  { id:"lat_raise_db", name:"Seitheben (KH)", m:"shoulders", s:[], inc:1 },
   { id:"lat_raise_cable", name:"Seitheben (Kabel)", m:"shoulders", s:[], inc:1 },
+  { id:"lat_raise_lean", name:"Seitheben angelehnt (Bank)", m:"shoulders", s:[], inc:1 },
   { id:"front_raise", name:"Frontheben", m:"shoulders", s:[], inc:1 },
   { id:"face_pull", name:"Face Pulls", m:"shoulders", s:["back","traps"], inc:2.5 },
-  { id:"rear_delt_fly", name:"Reverse Flys", m:"shoulders", s:["back"], inc:1 },
+  { id:"rear_delt_cable", name:"Reverse Flys (Kabel/Seil)", m:"shoulders", s:["back"], inc:1 },
+  { id:"rear_delt_machine", name:"Reverse Flys (Maschine)", m:"shoulders", s:["back"], inc:2.5 },
   { id:"upright_row", name:"Aufrechtes Rudern", m:"shoulders", s:["traps"], inc:2.5 },
   { id:"arnold_press", name:"Arnold Press", m:"shoulders", s:["triceps"], inc:2 },
-  { id:"shrugs", name:"Shrugs", m:"traps", s:["shoulders"], inc:5 },
-  // Biceps
+  { id:"shrugs_db", name:"Shrugs (KH)", m:"traps", s:["shoulders"], inc:5 },
+  { id:"shrugs_bb", name:"Shrugs (LH)", m:"traps", s:["shoulders"], inc:5 },
+  // ═══ BICEPS ═══
   { id:"curl_bb", name:"Langhantel-Curls", m:"biceps", s:[], inc:2.5 },
   { id:"curl_db", name:"KH-Curls", m:"biceps", s:[], inc:2 },
   { id:"curl_ez", name:"SZ-Curls", m:"biceps", s:[], inc:2.5 },
   { id:"hammer_curl", name:"Hammer Curls", m:"biceps", s:["forearms"], inc:2 },
-  { id:"preacher_curl", name:"Preacher Curls", m:"biceps", s:[], inc:2 },
+  { id:"preacher_curl", name:"Preacher Curls (Sitzbank)", m:"biceps", s:[], inc:2 },
+  { id:"preacher_machine", name:"Bizeps (Maschine/Curl-Sitz)", m:"biceps", s:[], inc:2.5 },
   { id:"incline_curl", name:"Incline Curls", m:"biceps", s:[], inc:2 },
-  { id:"cable_curl", name:"Kabel-Curls", m:"biceps", s:[], inc:2.5 },
+  { id:"cable_curl", name:"Bizeps Curls (Kabel)", m:"biceps", s:[], inc:2.5 },
   { id:"conc_curl", name:"Concentration Curls", m:"biceps", s:[], inc:1 },
-  // Triceps
-  { id:"tri_pushdown", name:"Trizepsdrücken (Kabel)", m:"triceps", s:[], inc:2.5 },
-  { id:"tri_overhead", name:"Overhead Extension", m:"triceps", s:[], inc:2 },
+  { id:"spider_curl", name:"Spider Curls", m:"biceps", s:[], inc:2 },
+  // ═══ TRICEPS ═══
+  { id:"tri_pushdown_rope", name:"Trizepsdrücken (Seil)", m:"triceps", s:[], inc:2.5 },
+  { id:"tri_pushdown_bar", name:"Trizepsdrücken (Stange)", m:"triceps", s:[], inc:2.5 },
+  { id:"tri_pushdown_single", name:"Trizepsdrücken einarmig (Kabel)", m:"triceps", s:[], inc:1 },
+  { id:"tri_overhead_db", name:"Overhead Extension (KH)", m:"triceps", s:[], inc:2 },
+  { id:"tri_overhead_cable", name:"Overhead Extension (Kabel)", m:"triceps", s:[], inc:2.5 },
   { id:"skull_crush", name:"Skull Crushers", m:"triceps", s:[], inc:2 },
   { id:"tri_dip", name:"Trizeps-Dips", m:"triceps", s:["chest"], inc:0, bw:true },
   { id:"tri_kickback", name:"Kickbacks", m:"triceps", s:[], inc:1 },
   { id:"close_grip_bench", name:"Enges Bankdrücken", m:"triceps", s:["chest"], inc:2.5 },
-  // Quads
+  // ═══ QUADS ═══
   { id:"squat_bb", name:"Kniebeugen (LH)", m:"quads", s:["glutes","core"], inc:2.5 },
   { id:"squat_front", name:"Front Squats", m:"quads", s:["core","glutes"], inc:2.5 },
+  { id:"squat_smith", name:"Kniebeugen (Smith Machine)", m:"quads", s:["glutes"], inc:2.5 },
   { id:"leg_press", name:"Beinpresse", m:"quads", s:["glutes"], inc:5 },
   { id:"leg_ext", name:"Beinstrecker", m:"quads", s:[], inc:2.5 },
   { id:"lunge_db", name:"Ausfallschritte (KH)", m:"quads", s:["glutes","hams"], inc:2 },
   { id:"bulgarian", name:"Bulgarian Split Squats", m:"quads", s:["glutes"], inc:2 },
   { id:"hack_squat", name:"Hack Squat", m:"quads", s:["glutes"], inc:5 },
   { id:"goblet_squat", name:"Goblet Squat", m:"quads", s:["core","glutes"], inc:2 },
-  // Hamstrings
+  // ═══ HAMSTRINGS ═══
   { id:"rdl", name:"Rumänisches Kreuzheben", m:"hams", s:["back","glutes"], inc:2.5 },
   { id:"leg_curl_lying", name:"Beinbeuger liegend", m:"hams", s:[], inc:2.5 },
   { id:"leg_curl_seated", name:"Beinbeuger sitzend", m:"hams", s:[], inc:2.5 },
   { id:"good_morning", name:"Good Mornings", m:"hams", s:["back","glutes"], inc:2.5 },
   { id:"stiff_leg_dl", name:"Gestrecktes Kreuzheben", m:"hams", s:["back","glutes"], inc:2.5 },
-  // Glutes
+  // ═══ GLUTES ═══
   { id:"hip_thrust", name:"Hip Thrust", m:"glutes", s:["hams"], inc:5 },
   { id:"glute_bridge", name:"Glute Bridge", m:"glutes", s:["hams"], inc:5 },
   { id:"cable_kickback", name:"Cable Kickbacks", m:"glutes", s:[], inc:2.5 },
-  // Calves
+  // ═══ CALVES ═══
   { id:"calf_raise_stand", name:"Wadenheben stehend", m:"calves", s:[], inc:5 },
   { id:"calf_raise_seated", name:"Wadenheben sitzend", m:"calves", s:[], inc:5 },
-  // Core
+  // ═══ CORE ═══
   { id:"plank", name:"Plank", m:"core", s:[], inc:0, timed:true },
   { id:"crunch", name:"Crunches", m:"core", s:[], inc:0, bw:true },
+  { id:"crunch_machine", name:"Bauchpresse (Maschine)", m:"core", s:[], inc:2.5 },
   { id:"cable_crunch", name:"Kabel-Crunches", m:"core", s:[], inc:2.5 },
   { id:"hanging_leg", name:"Hanging Leg Raises", m:"core", s:[], inc:0, bw:true },
   { id:"ab_wheel", name:"Ab Wheel Rollout", m:"core", s:[], inc:0, bw:true },
   { id:"russian_twist", name:"Russian Twists", m:"core", s:[], inc:2 },
   { id:"woodchop", name:"Woodchops (Kabel)", m:"core", s:["shoulders"], inc:2.5 },
-  // Forearms
+  { id:"situp", name:"Sit-Ups", m:"core", s:[], inc:0, bw:true },
+  { id:"decline_crunch", name:"Decline Crunches", m:"core", s:[], inc:0, bw:true },
+  // ═══ FOREARMS ═══
   { id:"wrist_curl", name:"Wrist Curls", m:"forearms", s:[], inc:1 },
   { id:"reverse_curl", name:"Reverse Curls", m:"forearms", s:["biceps"], inc:2 },
   { id:"farmer_walk", name:"Farmer Walks", m:"forearms", s:["traps","core"], inc:5 },
+  { id:"plate_pinch", name:"Plate Pinch Hold", m:"forearms", s:[], inc:0, timed:true },
 ];
 
 // Preset training day templates
 const SPLIT_PRESETS = {
+  max: { name: "Mein Split (5+1 Tage)", days: [
+    { name:"Brust + Trizeps", exercises:["chest_fly_cable","chest_fly_machine","chest_press_machine","incline_db","tri_pushdown_single","tri_pushdown_rope","tri_overhead_db"] },
+    { name:"Rücken + Bizeps", exercises:["lat_pull_wide","lat_pull_close","row_machine","pullup","row_machine_single","preacher_machine","cable_curl"] },
+    { name:"Schultern", exercises:["lat_raise_db","lat_raise_cable","lat_raise_lean","ohp_smith","ohp_machine","ohp_db","rear_delt_cable"] },
+    { name:"Beine + Bauch", exercises:["leg_ext","leg_curl_seated","leg_press","squat_bb","crunch_machine","cable_crunch","hanging_leg"] },
+    { name:"Arme + Unterarme", exercises:["curl_bb","hammer_curl","cable_curl","preacher_machine","tri_pushdown_rope","tri_overhead_db","reverse_curl","wrist_curl","farmer_walk"] },
+  ]},
   ppl: { name: "Push / Pull / Legs", days: [
-    { name:"Push", exercises:["bench_bb","incline_db","chest_fly_cable","ohp_db","lat_raise","tri_pushdown","skull_crush"] },
-    { name:"Pull", exercises:["deadlift","row_bb","lat_pull","cable_row","face_pull","curl_bb","hammer_curl"] },
-    { name:"Legs", exercises:["squat_bb","leg_press","rdl","leg_ext","leg_curl_lying","calf_raise_stand","hip_thrust"] },
+    { name:"Push", exercises:["bench_bb","incline_db","chest_fly_cable","ohp_db","lat_raise_db","tri_pushdown_rope","skull_crush"] },
+    { name:"Pull", exercises:["deadlift","row_bb","lat_pull_wide","cable_row","face_pull","curl_bb","hammer_curl"] },
+    { name:"Legs", exercises:["squat_bb","leg_press","rdl","leg_ext","leg_curl_seated","calf_raise_stand","hip_thrust"] },
   ]},
   ul: { name: "Upper / Lower", days: [
-    { name:"Upper", exercises:["bench_bb","row_bb","ohp_db","lat_pull","incline_db","curl_db","tri_pushdown","lat_raise"] },
-    { name:"Lower", exercises:["squat_bb","rdl","leg_press","leg_curl_lying","hip_thrust","calf_raise_stand","cable_crunch"] },
+    { name:"Upper", exercises:["bench_bb","row_bb","ohp_db","lat_pull_wide","incline_db","curl_db","tri_pushdown_rope","lat_raise_db"] },
+    { name:"Lower", exercises:["squat_bb","rdl","leg_press","leg_curl_seated","hip_thrust","calf_raise_stand","crunch_machine"] },
   ]},
   bro: { name: "Bro Split (5-Tage)", days: [
-    { name:"Brust", exercises:["bench_bb","incline_db","chest_fly_cable","pec_deck","dips"] },
-    { name:"Rücken", exercises:["deadlift","row_bb","lat_pull","cable_row","pullup","hyperext"] },
-    { name:"Schultern", exercises:["ohp_bb","lat_raise","rear_delt_fly","face_pull","shrugs","upright_row"] },
-    { name:"Arme", exercises:["curl_bb","hammer_curl","preacher_curl","tri_pushdown","skull_crush","overhead_ext:tri_overhead"] },
-    { name:"Beine", exercises:["squat_bb","leg_press","rdl","leg_ext","leg_curl_lying","calf_raise_stand","hip_thrust"] },
+    { name:"Brust", exercises:["bench_bb","incline_db","chest_fly_cable","chest_press_machine","dips"] },
+    { name:"Rücken", exercises:["deadlift","row_bb","lat_pull_wide","cable_row","pullup","hyperext"] },
+    { name:"Schultern", exercises:["ohp_bb","lat_raise_db","lat_raise_cable","rear_delt_cable","face_pull","shrugs_db"] },
+    { name:"Arme", exercises:["curl_bb","hammer_curl","preacher_machine","tri_pushdown_rope","skull_crush","tri_overhead_db"] },
+    { name:"Beine", exercises:["squat_bb","leg_press","rdl","leg_ext","leg_curl_seated","calf_raise_stand","hip_thrust"] },
   ]},
   fb: { name: "Ganzkörper (3x)", days: [
-    { name:"Ganzkörper A", exercises:["squat_bb","bench_bb","row_bb","ohp_db","curl_db","cable_crunch"] },
-    { name:"Ganzkörper B", exercises:["deadlift","incline_db","lat_pull","lat_raise","hammer_curl","hanging_leg"] },
-    { name:"Ganzkörper C", exercises:["leg_press","chest_fly_cable","cable_row","face_pull","tri_pushdown","hip_thrust"] },
+    { name:"Ganzkörper A", exercises:["squat_bb","bench_bb","row_bb","ohp_db","curl_db","crunch_machine"] },
+    { name:"Ganzkörper B", exercises:["deadlift","incline_db","lat_pull_wide","lat_raise_db","hammer_curl","hanging_leg"] },
+    { name:"Ganzkörper C", exercises:["leg_press","chest_fly_cable","cable_row","face_pull","tri_pushdown_rope","hip_thrust"] },
   ]},
 };
 
