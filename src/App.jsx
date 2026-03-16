@@ -395,7 +395,7 @@ export default function App(){
 
   // ═══ CARDIO MODE ═══
   return(
-    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:bodyFont,position:"relative",overflow:"hidden"}}>
+    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:bodyFont,position:"relative"}}>
       <link href={fontLink} rel="stylesheet"/>
       <style>{globalStyles}</style>
       {bgLayers}
