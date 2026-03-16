@@ -714,28 +714,32 @@ export default function StrengthTab({ C, data, update, onBack }) {
     setSub("log");
   };
 
-  // ═══ AI WORKOUT GENERATOR ═══
+  // ═══ AI WORKOUT GENERATOR (Kimi/Moonshot API — OpenAI-compatible) ═══
+  const getAiKey = () => {
+    try { const d = JSON.parse(localStorage.getItem("cardio-v4") || "{}"); return d.aiApiKey || ""; } catch { return ""; }
+  };
+
   const generateAiWorkout = async () => {
+    const apiKey = getAiKey();
+    if (!apiKey) { alert("Kein AI API-Key hinterlegt. Gehe zu Daten → AI API-Key eingeben."); return; }
+
     setAiLoading(true);
     setAiWorkout(null);
     try {
-      // Build context for Claude
+      // Build context
       const recoveryInfo = MG.map(m => `${m.name}: ${recMap[m.id] ?? 100}%`).join(", ");
 
-      // Last 5 workouts summary
       const recentWorkouts = sLog.slice(0, 5).map(w => {
         const muscles = [...new Set((w.exercises || []).map(e => EX.find(x => x.id === e.exerciseId)?.m).filter(Boolean))];
         const mgNames = muscles.map(mid => MG.find(m => m.id === mid)?.name || mid);
         return `${w.date}: ${mgNames.join(", ")} (${w.exercises?.length || 0} Übungen, ${w.duration || "?"}min)`;
       }).join("\n");
 
-      // Available exercises (filtered by equipment)
       const exList = availableEx.map(e => {
         const mg = MG.find(m => m.id === e.m);
         return `${e.id} | ${e.name} | ${mg?.name || e.m}`;
       }).join("\n");
 
-      // Training days pattern
       const splitInfo = trainingDays.length > 0
         ? trainingDays.map(d => `${d.name}: ${d.exercises.map(eid => EX.find(e => e.id === eid)?.name || eid).join(", ")}`).join("\n")
         : "Kein fester Split definiert.";
@@ -764,20 +768,28 @@ ${exList}
 Antworte NUR mit einem JSON-Objekt, kein anderer Text:
 {"name": "Workout-Name", "exercises": ["exercise_id_1", "exercise_id_2", ...], "reason": "Kurze Begründung auf Deutsch warum diese Auswahl"}`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("https://api.moonshot.ai/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "moonshot-v1-8k",
+          temperature: 0.7,
           max_tokens: 1000,
           messages: [{ role: "user", content: prompt }],
         }),
       });
 
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`API ${response.status}: ${err.slice(0, 100)}`);
+      }
 
-      // Parse JSON from response
+      const resData = await response.json();
+      const text = resData.choices?.[0]?.message?.content || "";
+
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("Keine gültige Antwort");
 
@@ -1018,6 +1030,7 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
                       trainingDays: current.trainingDays?.length ? current.trainingDays : (imported.trainingDays || []),
                       userEquipment: current.userEquipment || imported.userEquipment,
                       exerciseNotes: { ...(imported.exerciseNotes||{}), ...(current.exerciseNotes||{}) },
+                      aiApiKey: current.aiApiKey || imported.aiApiKey || "",
                     };
                     localStorage.setItem("cardio-v4", JSON.stringify(merged));
                     localStorage.removeItem("cardio-activeWorkout");
@@ -1041,6 +1054,27 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
                 }} style={{flex:1,padding:"12px 0",background:C.card,color:"#c46a6a",border:"1px solid rgba(196,106,106,0.3)",borderRadius:12,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:1.5,textTransform:"uppercase"}}>
                   Ersetzen
                 </button>
+              </div>
+            </div>
+
+            {/* AI API Key */}
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.sub,marginBottom:8}}>AI API-Key (Kimi/Moonshot)</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Für den AI Workout Generator. Key wird lokal gespeichert und bei Export/Import mit übertragen.</div>
+              <div style={{display:"flex",gap:8}}>
+                <input id="ai-key-field" type="password" placeholder="sk-..." defaultValue={(() => { try { return JSON.parse(localStorage.getItem("cardio-v4") || "{}").aiApiKey || ""; } catch { return ""; } })()} style={{
+                  flex:1,padding:"12px 14px",borderRadius:12,fontFamily:"'Manrope',monospace",fontSize:12,
+                  background:C.card,border:`1px solid ${C.border}`,color:C.text,outline:"none",
+                }}/>
+                <button onClick={()=>{
+                  const key = document.getElementById("ai-key-field").value.trim();
+                  try {
+                    const d = JSON.parse(localStorage.getItem("cardio-v4") || "{}");
+                    d.aiApiKey = key;
+                    localStorage.setItem("cardio-v4", JSON.stringify(d));
+                    alert(key ? "API-Key gespeichert!" : "API-Key entfernt.");
+                  } catch(e) { alert("Fehler: " + e.message); }
+                }} style={{padding:"12px 18px",background:C.card,color:C.sky,border:`1px solid ${C.sky}33`,borderRadius:12,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>Speichern</button>
               </div>
             </div>
 
