@@ -768,7 +768,8 @@ ${exList}
 Antworte NUR mit einem JSON-Objekt, kein anderer Text:
 {"name": "Workout-Name", "exercises": ["exercise_id_1", "exercise_id_2", ...], "reason": "Kurze Begründung auf Deutsch warum diese Auswahl"}`;
 
-      const response = await fetch("https://api.moonshot.ai/v1/chat/completions", {
+      const baseUrl = apiKey.startsWith("ak-") ? "https://api.moonshot.cn/v1" : "https://api.moonshot.ai/v1";
+      const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
