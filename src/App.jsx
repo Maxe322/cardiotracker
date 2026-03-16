@@ -394,14 +394,16 @@ export default function App(){
   }
 
   // ═══ CARDIO MODE ═══
+  // NOTE: Cardio uses a single combined background instead of separate fixed layers.
+  // Multiple position:fixed + backdrop-filter caused iOS Safari compositing bugs
+  // where content would flash then disappear. Simplified for stability.
   return(
-    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:bodyFont,position:"relative"}}>
+    <div style={{background:`radial-gradient(ellipse at 50% 30%, rgba(196,149,106,0.04) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,164,184,0.03) 0%, transparent 50%), linear-gradient(180deg, #0a0a0f 0%, #0d0d14 50%, #0a0a0f 100%)`,minHeight:"100vh",color:C.text,fontFamily:bodyFont,position:"relative",isolation:"isolate"}}>
       <link href={fontLink} rel="stylesheet"/>
       <style>{globalStyles}</style>
-      {bgLayers}
 
-      {/* HEADER */}
-      <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,15,0.8)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)"}}>
+      {/* HEADER — no backdrop-filter for iOS Safari stability */}
+      <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"#0b0b12"}}>
         <div style={{padding:"16px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
             <button onClick={()=>setMode(null)} style={{fontSize:11,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:bodyFont,fontWeight:600,padding:0,marginBottom:4,letterSpacing:3,textTransform:"uppercase"}}>&larr; ZURÜCK</button>
@@ -523,8 +525,8 @@ export default function App(){
         </div>
       )}
 
-      {/* CONTENT */}
-      <div style={{padding:"22px 20px 48px"}}>
+      {/* CONTENT — explicit stacking context for iOS Safari stability */}
+      <div style={{padding:"22px 20px 48px",position:"relative",zIndex:1}}>
 
         {/* ═══ DASHBOARD ═══ */}
         {view==="dash"&&(
