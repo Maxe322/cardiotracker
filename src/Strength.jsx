@@ -579,7 +579,9 @@ const COMPOUND_IDS = ["bench_bb","bench_db","incline_bb","incline_db","decline_b
 export default function StrengthTab({ C, data, update, onBack }) {
   const [sub, setSub] = useState("log");
   const [detailEx, setDetailEx] = useState(null); // exercise detail view
-  const [active, setActive] = useState(null);
+  const [active, setActive] = useState(() => {
+    try { const s = localStorage.getItem("cardio-activeWorkout"); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
   const [picker, setPicker] = useState(false);
   const [exFilter, setExFilter] = useState("all");
   const [searchQ, setSearchQ] = useState("");
@@ -593,6 +595,14 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const [showSplits, setShowSplits] = useState(false);
   const [summary, setSummary] = useState(null); // workout summary after finish
   const timerRef = useRef(null);
+
+  // ═══ PERSIST ACTIVE WORKOUT ═══
+  useEffect(() => {
+    try {
+      if (active) localStorage.setItem("cardio-activeWorkout", JSON.stringify(active));
+      else localStorage.removeItem("cardio-activeWorkout");
+    } catch {}
+  }, [active]);
 
   const sLog = data.strengthLog || [];
   const templates = data.strengthTemplates || [];
