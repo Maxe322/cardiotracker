@@ -218,6 +218,72 @@ function suggestWeight(exerciseId, prevSets, goalReps=[8,12], allLog=[], recover
 
 function est1RM(w, r) { return r<=0||w<=0?0:r===1?w:Math.round(w*(36/(37-Math.min(r,36)))*10)/10; }
 
+// ═══ WARM-UP GENERATOR ═══
+const WARMUP_EXERCISE_IDS = new Set([
+  "bench_bb","bench_db","incline_bb","incline_db","decline_bb","chest_press_machine",
+  "deadlift","row_bb","tbar_row","lat_pull_wide","lat_pull_close","cable_row",
+  "ohp_bb","ohp_db","ohp_smith","ohp_machine",
+  "squat_bb","squat_front","squat_smith","leg_press","hack_squat",
+  "rdl","stiff_leg_dl","good_morning",
+  "hip_thrust","glute_bridge",
+  "close_grip_bench","skull_crush",
+  "curl_bb","curl_ez",
+  "row_machine",
+]);
+
+function isWarmupRelevant(exerciseId) {
+  const ex = EX.find(e => e.id === exerciseId);
+  if (!ex || ex.bw || ex.timed) return false;
+  if (WARMUP_EXERCISE_IDS.has(exerciseId)) return true;
+  // Also relevant if the exercise uses a barbell or smith or is a compound (has secondary muscles)
+  if (ex.eq?.some(e => e === "bb" || e === "smith") && ex.s?.length > 0) return true;
+  return false;
+}
+
+function roundToIncrement(weight, increment) {
+  if (increment <= 0) return Math.round(weight);
+  return Math.round(weight / increment) * increment;
+}
+
+function generateWarmupSets(exerciseId, targetWeight) {
+  const ex = EX.find(e => e.id === exerciseId);
+  if (!ex || targetWeight <= 0) return [];
+
+  const inc = ex.inc || 2.5;
+  const sets = [];
+
+  // For very light work weights (<= 30kg), simplified warmup
+  if (targetWeight <= 30) {
+    const w1 = roundToIncrement(targetWeight * 0.5, inc);
+    if (w1 >= inc) {
+      sets.push({ weight: w1, reps: 10, done: false, type: "W", rpe: 0 });
+    }
+    return sets;
+  }
+
+  // Standard ramp: ~37%, ~57%, ~72%, optional ~82% for heavy
+  const ramp = [
+    { pct: 0.37, reps: 10 },
+    { pct: 0.57, reps: 6 },
+    { pct: 0.72, reps: 3 },
+  ];
+
+  // Add a heavy single for work weights > 80kg
+  if (targetWeight > 80) {
+    ramp.push({ pct: 0.82, reps: 1 });
+  }
+
+  for (const step of ramp) {
+    const w = roundToIncrement(targetWeight * step.pct, inc);
+    // Skip if weight rounds to 0 or is same as previous
+    if (w < inc) continue;
+    if (sets.length > 0 && w <= sets[sets.length - 1].weight) continue;
+    sets.push({ weight: w, reps: step.reps, done: false, type: "W", rpe: 0 });
+  }
+
+  return sets;
+}
+
 function muscleRec(muscle, log) {
   const now = Date.now(); let lastTime = 0; let lastVolume = 0;
   for (const w of log) for (const ex of (w.exercises||[])) {
@@ -354,6 +420,29 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const addSet = (ei) => setActive(p => { const ls = p.exercises[ei].sets.slice(-1)[0] || {weight:0,reps:10,type:"N",rpe:0}; return {...p,exercises:p.exercises.map((e,i)=>i!==ei?e:{...e,sets:[...e.sets,{weight:ls.weight,reps:ls.reps,done:false,type:"N",rpe:0}]})}; });
   const rmSet = (ei, si) => setActive(p => ({...p,exercises:p.exercises.map((e,i)=>i!==ei?e:{...e,sets:e.sets.filter((_,j)=>j!==si)})}));
   const rmEx = (ei) => setActive(p => ({...p,exercises:p.exercises.filter((_,i)=>i!==ei)}));
+
+  const applyWarmup = (ei) => {
+    setActive(p => {
+      const ex = p.exercises[ei];
+      if (!ex) return p;
+      // Find first non-warmup set as target weight
+      const firstWork = ex.sets.find(s => s.type !== "W");
+      if (!firstWork || firstWork.weight <= 0) return p;
+      const warmups = generateWarmupSets(ex.exerciseId, firstWork.weight);
+      if (!warmups.length) return p;
+      // Remove existing warmup sets, then prepend new ones
+      const workSets = ex.sets.filter(s => s.type !== "W");
+      return { ...p, exercises: p.exercises.map((e, i) => i !== ei ? e : { ...e, sets: [...warmups, ...workSets] }) };
+    });
+  };
+
+  const removeWarmup = (ei) => {
+    setActive(p => {
+      const ex = p.exercises[ei];
+      if (!ex) return p;
+      return { ...p, exercises: p.exercises.map((e, i) => i !== ei ? e : { ...e, sets: e.sets.filter(s => s.type !== "W") }) };
+    });
+  };
 
   // ═══ FINISH WITH SUMMARY ═══
   const finish = () => {
@@ -625,6 +714,29 @@ export default function StrengthTab({ C, data, update, onBack }) {
                 </div>
                 {sug && <div style={{background:C.goldBg,borderRadius:10,padding:"8px 12px",marginBottom:8,border:`1px solid ${C.gold}20`,fontSize:12,color:C.gold,fontWeight:600}}>{sug.reason}</div>}
                 {prev && <div style={{fontSize:11,color:C.dim,marginBottom:6}}>Letztes Mal ({new Date(prev.date).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})}): {prev.sets.map(s=>`${s.weight}x${s.reps}${s.type&&s.type!=="N"?` (${s.type})`:""}${s.rpe?` @${s.rpe}`:""}`).join(" / ")}</div>}
+
+                {/* Warm-up actions */}
+                {isWarmupRelevant(ex.exerciseId) && (()=>{
+                  const hasWarmup = ex.sets.some(s => s.type === "W");
+                  const firstWork = ex.sets.find(s => s.type !== "W");
+                  const canGenerate = firstWork && firstWork.weight > 0;
+                  return (
+                    <div style={{display:"flex",gap:6,marginBottom:8}}>
+                      {!hasWarmup && canGenerate && (
+                        <button onClick={()=>applyWarmup(ei)} style={{padding:"5px 12px",borderRadius:8,background:`${C.gold}14`,border:`1px solid ${C.gold}30`,color:C.gold,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Warm-up</button>
+                      )}
+                      {hasWarmup && (
+                        <>
+                          <button onClick={()=>applyWarmup(ei)} style={{padding:"5px 12px",borderRadius:8,background:`${C.gold}14`,border:`1px solid ${C.gold}30`,color:C.gold,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Neu berechnen</button>
+                          <button onClick={()=>removeWarmup(ei)} style={{padding:"5px 12px",borderRadius:8,background:C.card,border:`1px solid ${C.border}`,color:C.dim,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Entfernen</button>
+                        </>
+                      )}
+                      {!canGenerate && !hasWarmup && (
+                        <div style={{fontSize:11,color:C.dim,fontStyle:"italic"}}>Gewicht eintragen für Warm-up</div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Header */}
                 <div style={{display:"grid",gridTemplateColumns:"28px 42px 1fr 1fr 36px 40px 32px",gap:3,marginBottom:4}}>
