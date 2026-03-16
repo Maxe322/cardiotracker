@@ -620,18 +620,24 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const trainingDays = data.trainingDays || [];
   const userEquipment = data.userEquipment || EQUIPMENT.map(e => e.id);
   const exerciseNotes = data.exerciseNotes || {}; // { [exerciseId]: "note text" }
+  const customExercises = data.customExercises || []; // user-created exercises
   const [showEqSettings, setShowEqSettings] = useState(false);
   const [showDataPanel, setShowDataPanel] = useState(false);
-  const [editingNoteFor, setEditingNoteFor] = useState(null); // exerciseId being edited
+  const [showCustomExModal, setShowCustomExModal] = useState(false);
+  const [editingNoteFor, setEditingNoteFor] = useState(null);
   const [noteText, setNoteText] = useState("");
 
-  const save = useCallback((log, tmpls, days, eq, notes) => {
+  // Merge built-in + custom exercises
+  const ALL_EX = useMemo(() => [...EX, ...customExercises], [customExercises]);
+
+  const save = useCallback((log, tmpls, days, eq, notes, custEx) => {
     update(prev => ({
       ...(log !== undefined ? { strengthLog: log } : {}),
       ...(tmpls !== undefined ? { strengthTemplates: tmpls } : {}),
       ...(days !== undefined ? { trainingDays: days } : {}),
       ...(eq !== undefined ? { userEquipment: eq } : {}),
       ...(notes !== undefined ? { exerciseNotes: notes } : {}),
+      ...(custEx !== undefined ? { customExercises: custEx } : {}),
     }));
   }, [update]);
 
@@ -654,7 +660,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
   };
 
   // Filter exercises by user equipment
-  const availableEx = useMemo(() => EX.filter(ex => ex.eq.some(e => userEquipment.includes(e))), [userEquipment]);
+  const availableEx = useMemo(() => ALL_EX.filter(ex => ex.eq?.length ? ex.eq.some(e => userEquipment.includes(e)) : true), [userEquipment, ALL_EX]);
 
   // Recently used exercises
   const recentExIds = useMemo(() => {
@@ -702,7 +708,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const startWorkout = (fromTmpl) => {
     const exercises = fromTmpl ? fromTmpl.exercises.map(e => {
       const eid = typeof e === "string" ? e : e.exerciseId;
-      if (!EX.some(x => x.id === eid)) return null;
+      if (!ALL_EX.some(x => x.id === eid)) return null;
       return { exerciseId: eid, sets: mkSets(eid) };
     }).filter(Boolean) : [];
     setActive({ id: Date.now().toString(), date: new Date().toISOString().slice(0,10), start: Date.now(), exercises });
@@ -796,7 +802,7 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
       if (!jsonMatch) throw new Error("Keine gültige Antwort");
 
       const result = JSON.parse(jsonMatch[0]);
-      const validExercises = (result.exercises || []).filter(eid => EX.some(e => e.id === eid));
+      const validExercises = (result.exercises || []).filter(eid => ALL_EX.some(e => e.id === eid));
 
       if (!validExercises.length) throw new Error("Keine gültigen Übungen generiert");
 
@@ -1006,6 +1012,90 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
     };
   }, [sLog]);
 
+  // ═══ TRAINING STREAKS & GAMIFICATION ═══
+  const gamification = useMemo(() => {
+    if (!sLog.length) return { weekStreak: 0, totalWorkouts: 0, xp: 0, level: 1, levelName: "Anfänger", nextLevelXp: 100, badges: [] };
+
+    const getWeekKey = (dateStr) => {
+      const d = new Date(dateStr);
+      const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      return mon.toISOString().slice(0, 10);
+    };
+    const weekSet = new Set(sLog.map(w => getWeekKey(w.date)));
+    let weekStreak = 0;
+    const now = new Date();
+    for (let i = 0; i < 52; i++) {
+      const d = new Date(now); d.setDate(now.getDate() - i * 7);
+      if (weekSet.has(getWeekKey(d.toISOString().slice(0, 10)))) weekStreak++;
+      else break;
+    }
+
+    const totalWorkouts = sLog.length;
+    let xp = 0;
+    sLog.forEach(w => {
+      xp += 50;
+      xp += (w.exercises || []).length * 10;
+      const vol = (w.exercises || []).reduce((a, ex) => a + ex.sets.filter(s => s.type !== "W").reduce((b, s) => b + (+s.weight||0) * (+s.reps||0), 0), 0);
+      xp += Math.floor(vol / 100);
+    });
+    xp += weekStreak * 30;
+
+    const LEVELS = [
+      { xp: 0, name: "Anfänger" }, { xp: 100, name: "Einsteiger" }, { xp: 300, name: "Regular" },
+      { xp: 600, name: "Dedicated" }, { xp: 1000, name: "Athlete" }, { xp: 1500, name: "Advanced" },
+      { xp: 2500, name: "Elite" }, { xp: 4000, name: "Champion" }, { xp: 6000, name: "Legend" },
+      { xp: 10000, name: "Titan" }, { xp: 15000, name: "Mythic" },
+    ];
+    let level = 1, levelName = "Anfänger", nextLevelXp = 100;
+    for (let i = LEVELS.length - 1; i >= 0; i--) {
+      if (xp >= LEVELS[i].xp) { level = i + 1; levelName = LEVELS[i].name; nextLevelXp = LEVELS[i + 1]?.xp || LEVELS[i].xp * 2; break; }
+    }
+
+    const badges = [];
+    if (totalWorkouts >= 1) badges.push({ icon: "🏋️", label: "Erster Schritt" });
+    if (totalWorkouts >= 10) badges.push({ icon: "💪", label: "Zweistellig" });
+    if (totalWorkouts >= 25) badges.push({ icon: "⚡", label: "Quarter" });
+    if (totalWorkouts >= 50) badges.push({ icon: "🔥", label: "Halbhundert" });
+    if (totalWorkouts >= 100) badges.push({ icon: "👑", label: "Centurion" });
+    if (weekStreak >= 4) badges.push({ icon: "📅", label: `${weekStreak}W Streak` });
+    if (weekStreak >= 12) badges.push({ icon: "🏆", label: "12W Streak" });
+    const totalVol = sLog.reduce((a, w) => a + (w.exercises || []).reduce((b, ex) => b + ex.sets.filter(s => s.type !== "W").reduce((c, s) => c + (+s.weight||0) * (+s.reps||0), 0), 0), 0);
+    if (totalVol >= 100000) badges.push({ icon: "🏗️", label: "100t Club" });
+    if (totalVol >= 500000) badges.push({ icon: "🌋", label: "500t Club" });
+
+    return { weekStreak, totalWorkouts, xp, level, levelName, nextLevelXp, badges, totalVol };
+  }, [sLog]);
+
+  // ═══ REST-DAY RECOMMENDATION ═══
+  const restDayAdvice = useMemo(() => {
+    if (!sLog.length) return null;
+
+    const fatigued = MG.filter(m => (recMap[m.id] || 100) < 50).map(m => ({ ...m, rec: recMap[m.id] || 0 }));
+    const ready = MG.filter(m => (recMap[m.id] || 100) >= 75).map(m => ({ ...m, rec: recMap[m.id] || 0 }));
+
+    const lastDate = sLog[0]?.date;
+    if (!lastDate) return null;
+    const daysSinceLast = Math.floor((Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24));
+
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + (weekStart.getDay() === 0 ? -6 : 1));
+    const thisWeekSessions = sLog.filter(w => w.date >= weekStart.toISOString().slice(0, 10)).length;
+
+    if (daysSinceLast === 0 && thisWeekSessions >= 5) {
+      return { type: "rest", message: "Ruhetag empfohlen — 5+ Sessions diese Woche.", detail: "Regeneration ist genauso wichtig wie Training." };
+    }
+    if (fatigued.length >= 6) {
+      return { type: "rest", message: "Ruhetag empfohlen — viele Muskeln erschöpft.", detail: fatigued.slice(0, 4).map(m => m.name).join(", ") + " brauchen Erholung." };
+    }
+    if (fatigued.length > 0 && ready.length > 0) {
+      const suggestGroups = ready.slice(0, 3).map(m => m.name).join(", ");
+      return { type: "train", message: `Heute empfohlen: ${suggestGroups}`, detail: fatigued.map(m => m.name).join(", ") + (fatigued.length > 1 ? " brauchen" : " braucht") + " noch Erholung." };
+    }
+    if (daysSinceLast >= 3) {
+      return { type: "train", message: "Zeit für ein Workout!", detail: `Letztes Training vor ${daysSinceLast} Tagen. Alle Muskeln sind erholt.` };
+    }
+    return null;
+  }, [sLog, recMap]);
+
   // Filtered exercises for picker
   const filteredEx = useMemo(() => {
     let list = availableEx;
@@ -1176,9 +1266,77 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
         </div>
       )}
 
+      {/* ═══ CUSTOM EXERCISE CREATOR ═══ */}
+      {showCustomExModal && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(10px)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowCustomExModal(false)}}>
+          <div style={{background:C.elevated,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",animation:"slideUp 0.25s ease-out",maxHeight:"80vh",overflowY:"auto"}}>
+            <div style={{width:40,height:5,borderRadius:3,background:C.borderLight,margin:"0 auto 16px"}}/>
+            <div style={{fontSize:18,fontWeight:700,marginBottom:16}}>Eigene Übung erstellen</div>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div>
+                <div style={{fontSize:11,color:C.muted,marginBottom:4,fontWeight:600}}>Name</div>
+                <input id="cex-name" placeholder="z.B. Cable Lateral Raise" style={{width:"100%",padding:"12px 14px",borderRadius:12,background:C.card,border:`1px solid ${C.border}`,color:C.text,fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:C.muted,marginBottom:4,fontWeight:600}}>Muskelgruppe</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {MG.map(m => (
+                    <button key={m.id} id={`cex-mg-${m.id}`} onClick={e => {
+                      document.querySelectorAll("[id^=cex-mg-]").forEach(el => { el.style.border = `1px solid ${C.border}`; el.style.background = C.card; el.dataset.selected = ""; });
+                      e.currentTarget.style.border = `1.5px solid ${m.color}`; e.currentTarget.style.background = `${m.color}14`; e.currentTarget.dataset.selected = m.id;
+                    }} style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.sub,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{m.name}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div>
+                  <div style={{fontSize:11,color:C.muted,marginBottom:4,fontWeight:600}}>Increment (kg)</div>
+                  <input id="cex-inc" type="number" defaultValue="2.5" step="0.5" style={{width:"100%",padding:"12px 14px",borderRadius:12,background:C.card,border:`1px solid ${C.border}`,color:C.text,fontSize:14,fontFamily:"inherit",outline:"none"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:C.muted,marginBottom:4,fontWeight:600}}>Equipment</div>
+                  <select id="cex-eq" style={{width:"100%",padding:"12px 14px",borderRadius:12,background:C.card,border:`1px solid ${C.border}`,color:C.text,fontSize:14,fontFamily:"inherit",outline:"none"}}>
+                    {EQUIPMENT.map(eq => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <button onClick={() => {
+              const name = document.getElementById("cex-name")?.value?.trim();
+              const mgEl = document.querySelector("[id^=cex-mg-][data-selected]:not([data-selected=''])");
+              const mg = mgEl?.dataset?.selected;
+              const inc = parseFloat(document.getElementById("cex-inc")?.value) || 2.5;
+              const eq = document.getElementById("cex-eq")?.value || "bw";
+              if (!name) { alert("Name eingeben"); return; }
+              if (!mg) { alert("Muskelgruppe wählen"); return; }
+              const id = "custom_" + Date.now();
+              const newEx = { id, name, m: mg, s: [], inc, eq: [eq] };
+              save(undefined, undefined, undefined, undefined, undefined, [...customExercises, newEx]);
+              setShowCustomExModal(false);
+            }} style={{width:"100%",padding:"14px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase",marginTop:16}}>Erstellen</button>
+            {/* List existing custom exercises */}
+            {customExercises.length > 0 && (
+              <div style={{marginTop:16}}>
+                <div style={{fontSize:11,color:C.muted,fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>Eigene Übungen ({customExercises.length})</div>
+                {customExercises.map(ex => (
+                  <div key={ex.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderRadius:10,background:C.card,border:`1px solid ${C.border}`,marginBottom:4}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:C.text}}>{ex.name}</div>
+                      <div style={{fontSize:10,color:MG.find(m=>m.id===ex.m)?.color||C.dim}}>{MG.find(m=>m.id===ex.m)?.name}</div>
+                    </div>
+                    <button onClick={() => { if (confirm(`"${ex.name}" löschen?`)) save(undefined, undefined, undefined, undefined, undefined, customExercises.filter(e => e.id !== ex.id)); }} style={{width:28,height:28,borderRadius:8,background:C.emberBg,border:`1px solid ${C.ember}30`,color:C.ember,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={()=>setShowCustomExModal(false)} style={{width:"100%",padding:"12px 0",background:"transparent",color:C.muted,border:"none",fontSize:14,cursor:"pointer",fontFamily:"inherit",marginTop:8}}>Schließen</button>
+          </div>
+        </div>
+      )}
+
       {/* ═══ NOTE EDITOR MODAL ═══ */}
       {editingNoteFor && (()=>{
-        const def = EX.find(e=>e.id===editingNoteFor);
+        const def = ALL_EX.find(e=>e.id===editingNoteFor);
         return (
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(10px)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget){saveNoteEditor()}}}>
             <div style={{background:C.surface,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",animation:"slideUp 0.25s ease-out"}}>
@@ -1286,6 +1444,8 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
               );
             })}
             {filteredEx.length === 0 && <div style={{textAlign:"center",padding:20,color:C.dim}}>Keine Übungen gefunden</div>}
+            {/* Create custom exercise button */}
+            <button onClick={()=>{setPicker(false);setShowCustomExModal(true)}} style={{width:"100%",padding:"12px 0",background:"transparent",color:C.sky,border:`1px dashed ${C.sky}30`,borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:8,letterSpacing:1}}>+ Eigene Übung erstellen</button>
           </div>
         </div>
       )}
@@ -1300,6 +1460,58 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
       {/* ═══ WORKOUT LOG ═══ */}
       {sub==="log" && !active && (
         <div>
+          {/* ═══ GAMIFICATION CARD ═══ */}
+          {gamification.totalWorkouts > 0 && (
+            <div style={{background:C.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:`linear-gradient(135deg, ${C.ember}20, ${C.gold}15)`,border:`1px solid ${C.ember}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>🔥</div>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:800,color:C.text}}>Level {gamification.level} · {gamification.levelName}</div>
+                    <div style={{fontSize:10,color:C.muted}}>{gamification.xp} XP · {gamification.weekStreak}W Streak</div>
+                  </div>
+                </div>
+                <div style={{fontSize:18,fontWeight:300,color:C.ember,fontFamily:"'Cormorant Garamond',serif"}}>{gamification.totalWorkouts}</div>
+              </div>
+              {/* XP progress bar */}
+              <div style={{height:4,background:"rgba(255,255,255,0.04)",borderRadius:2,overflow:"hidden",marginBottom:8}}>
+                <div style={{height:"100%",width:`${Math.min((gamification.xp / gamification.nextLevelXp) * 100, 100)}%`,background:`linear-gradient(90deg, ${C.ember}88, ${C.ember})`,borderRadius:2,transition:"width 1s ease",boxShadow:`0 0 6px ${C.ember}33`}}/>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:C.dim}}>
+                <span>{gamification.xp} / {gamification.nextLevelXp} XP</span>
+                <span>Nächstes Level</span>
+              </div>
+              {/* Badges row */}
+              {gamification.badges.length > 0 && (
+                <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+                  {gamification.badges.map((b, i) => (
+                    <div key={i} style={{padding:"4px 8px",borderRadius:6,background:C.card,border:`1px solid ${C.border}`,fontSize:10,fontWeight:600,color:C.sub,display:"flex",alignItems:"center",gap:4}}>
+                      <span>{b.icon}</span>{b.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ REST-DAY / TRAINING RECOMMENDATION ═══ */}
+          {restDayAdvice && (
+            <div style={{
+              background: restDayAdvice.type === "rest"
+                ? "linear-gradient(135deg, rgba(139,164,184,0.08), rgba(139,164,184,0.03))"
+                : "linear-gradient(135deg, rgba(168,184,124,0.08), rgba(168,184,124,0.03))",
+              borderRadius:14,padding:"14px 16px",marginBottom:12,
+              border:`1px solid ${restDayAdvice.type === "rest" ? "rgba(139,164,184,0.2)" : "rgba(168,184,124,0.2)"}`,
+              display:"flex",alignItems:"flex-start",gap:12,
+            }}>
+              <div style={{fontSize:18,marginTop:1}}>{restDayAdvice.type === "rest" ? "😴" : "💪"}</div>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:restDayAdvice.type==="rest"?C.sky:C.lime,marginBottom:2}}>{restDayAdvice.message}</div>
+                <div style={{fontSize:10,color:C.muted,lineHeight:1.4}}>{restDayAdvice.detail}</div>
+              </div>
+            </div>
+          )}
+
           {/* AI Workout Generator */}
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
           <div style={{marginBottom:18}}>
