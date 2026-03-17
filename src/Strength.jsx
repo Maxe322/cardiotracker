@@ -1559,7 +1559,7 @@ REGELN FÜR DEINE ANTWORTEN:
   }, [exFilter, searchQ, availableEx]);
 
   const inp = {width:"100%",padding:"11px 14px",background:C.card,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,fontSize:14,fontFamily:"'Manrope',sans-serif",outline:"none",boxSizing:"border-box",textAlign:"center"};
-  const sty = {card:{background:C.surface,borderRadius:20,padding:"18px 14px",border:`1px solid ${C.border}`,marginBottom:14,backdropFilter:"blur(20px)"},lbl:{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:4,textTransform:"uppercase",marginBottom:14,paddingLeft:4,fontFamily:"'Manrope',sans-serif"}};
+  const sty = {card:{background:C.surface,borderRadius:16,padding:"18px 14px",border:`1px solid ${C.border}`,marginBottom:14,backdropFilter:"blur(20px)"},lbl:{fontSize:9,fontWeight:700,color:C.muted,letterSpacing:3.5,textTransform:"uppercase",marginBottom:14,paddingLeft:4,fontFamily:"'Manrope',sans-serif"}};
   const fmtT = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
   return (
@@ -1948,11 +1948,33 @@ REGELN FÜR DEINE ANTWORTEN:
         </div>
       )}
 
-    <div style={{padding:"22px 20px 48px",animation:"fadeIn 0.35s ease"}}>
-      <div style={{display:"flex",gap:0,marginBottom:20,borderBottom:`1px solid ${C.border}`}}>
-        {[["log","Workout"],["days","Tage"],["history","Verlauf"],["muscles","Muskeln"],["coach","Coach"]].map(([k,l])=>(
-          <button key={k} onClick={()=>setSub(k)} style={{flex:1,padding:"12px 0 10px",background:"transparent",border:"none",borderBottom:sub===k?`2px solid ${C.ember}`:"2px solid transparent",color:sub===k?C.text:C.dim,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2.5,textTransform:"uppercase",transition:"all 0.3s"}}>{l}</button>
-        ))}
+    <div style={{padding:"22px 20px 100px",animation:"fadeIn 0.35s ease"}}>
+
+      {/* ═══ FIXED BOTTOM NAV ═══ */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:60,background:"rgba(10,10,15,0.92)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderTop:`1px solid ${C.border}`,paddingBottom:"env(safe-area-inset-bottom, 0px)"}}>
+        <div style={{display:"flex",maxWidth:480,margin:"0 auto"}}>
+          {[
+            ["log","Workout","◎"],
+            ["days","Tage","▤"],
+            ["history","Verlauf","◔"],
+            ["muscles","Muskeln","⬡"],
+            ["coach","Coach","✦"],
+          ].map(([k,l,icon])=>{
+            const active2 = sub===k;
+            return (
+              <button key={k} onClick={()=>setSub(k)} style={{
+                flex:1,padding:"10px 0 8px",background:"transparent",border:"none",
+                color:active2?C.ember:C.dim,cursor:"pointer",fontFamily:"'Manrope',sans-serif",
+                display:"flex",flexDirection:"column",alignItems:"center",gap:3,
+                transition:"all 0.2s",position:"relative",
+              }}>
+                {active2 && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:20,height:2,background:C.ember,borderRadius:1}} />}
+                <span style={{fontSize:18,lineHeight:1,filter:active2?`drop-shadow(0 0 6px ${C.ember}66)`:"none",transition:"filter 0.2s"}}>{icon}</span>
+                <span style={{fontSize:9,fontWeight:active2?700:500,letterSpacing:1.5,textTransform:"uppercase"}}>{l}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ═══ WORKOUT LOG ═══ */}
@@ -1960,35 +1982,45 @@ REGELN FÜR DEINE ANTWORTEN:
         <div>
           {/* ═══ GAMIFICATION CARD ═══ */}
           {gamification.totalWorkouts > 0 && (
-            <div style={{background:C.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:12}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div style={{width:36,height:36,borderRadius:10,background:`linear-gradient(135deg, ${C.ember}20, ${C.gold}15)`,border:`1px solid ${C.ember}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>🔥</div>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:800,color:C.text}}>Level {gamification.level} · {gamification.levelName}</div>
-                    <div style={{fontSize:10,color:C.muted}}>{gamification.xp} XP · {gamification.weekStreak}W Streak</div>
+            <div className="card3d" style={{marginBottom:12}}
+              onTouchStart={e=>{const el=e.currentTarget.querySelector('.card3d-inner');if(el){el.style.transform='rotateX(2deg) rotateY(-1deg) scale(1.01)';el.style.boxShadow=`0 8px 32px rgba(0,0,0,0.3), 0 0 20px ${C.ember}10`}}}
+              onTouchEnd={e=>{const el=e.currentTarget.querySelector('.card3d-inner');if(el){el.style.transform='';el.style.boxShadow=''}}}
+            >
+              <div className="card3d-inner" style={{background:`linear-gradient(145deg, ${C.surface}, rgba(20,20,30,0.95))`,borderRadius:16,padding:"16px 18px",border:`1px solid ${C.accentBorder}`,position:"relative",overflow:"hidden"}}>
+                {/* Subtle accent glow */}
+                <div style={{position:"absolute",top:-20,right:-20,width:100,height:100,background:`radial-gradient(circle, ${C.ember}0a, transparent 70%)`,pointerEvents:"none"}} />
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,position:"relative"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:40,height:40,borderRadius:12,background:`linear-gradient(135deg, ${C.ember}25, ${C.gold}15)`,border:`1px solid ${C.ember}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,boxShadow:`0 0 12px ${C.ember}15`}}>🔥</div>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:800,color:C.text,letterSpacing:0.3}}>Level {gamification.level}</div>
+                      <div style={{fontSize:11,color:C.ember,fontWeight:600}}>{gamification.levelName}</div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:22,fontWeight:300,color:C.ember,fontFamily:"'Cormorant Garamond',serif",lineHeight:1}}>{gamification.totalWorkouts}</div>
+                    <div style={{fontSize:9,color:C.dim,letterSpacing:1}}>WORKOUTS</div>
                   </div>
                 </div>
-                <div style={{fontSize:18,fontWeight:300,color:C.ember,fontFamily:"'Cormorant Garamond',serif"}}>{gamification.totalWorkouts}</div>
-              </div>
-              {/* XP progress bar */}
-              <div style={{height:4,background:"rgba(255,255,255,0.04)",borderRadius:2,overflow:"hidden",marginBottom:8}}>
-                <div style={{height:"100%",width:`${Math.min((gamification.xp / gamification.nextLevelXp) * 100, 100)}%`,background:`linear-gradient(90deg, ${C.ember}88, ${C.ember})`,borderRadius:2,transition:"width 1s ease",boxShadow:`0 0 6px ${C.ember}33`}}/>
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:C.dim}}>
-                <span>{gamification.xp} / {gamification.nextLevelXp} XP</span>
-                <span>Nächstes Level</span>
-              </div>
-              {/* Badges row */}
-              {gamification.badges.length > 0 && (
-                <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
-                  {gamification.badges.map((b, i) => (
-                    <div key={i} style={{padding:"4px 8px",borderRadius:6,background:C.card,border:`1px solid ${C.border}`,fontSize:10,fontWeight:600,color:C.sub,display:"flex",alignItems:"center",gap:4}}>
-                      <span>{b.icon}</span>{b.label}
-                    </div>
-                  ))}
+                {/* XP progress bar */}
+                <div style={{height:5,background:"rgba(255,255,255,0.04)",borderRadius:3,overflow:"hidden",marginBottom:6}}>
+                  <div style={{height:"100%",width:`${Math.min((gamification.xp / gamification.nextLevelXp) * 100, 100)}%`,background:`linear-gradient(90deg, ${C.ember}88, ${C.ember}, ${C.gold})`,borderRadius:3,transition:"width 1s cubic-bezier(.4,0,.2,1)",boxShadow:`0 0 8px ${C.ember}44`}}/>
                 </div>
-              )}
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:C.dim,marginBottom:gamification.badges.length?10:0}}>
+                  <span>{gamification.xp} / {gamification.nextLevelXp} XP</span>
+                  <span>{gamification.weekStreak > 0 ? `${gamification.weekStreak}W Streak 🔥` : "Nächstes Level"}</span>
+                </div>
+                {/* Badges row */}
+                {gamification.badges.length > 0 && (
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {gamification.badges.map((b, i) => (
+                      <div key={i} style={{padding:"4px 10px",borderRadius:8,background:`${C.ember}08`,border:`1px solid ${C.ember}18`,fontSize:10,fontWeight:600,color:C.sub,display:"flex",alignItems:"center",gap:4}}>
+                        <span>{b.icon}</span>{b.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -2032,7 +2064,7 @@ REGELN FÜR DEINE ANTWORTEN:
 
           {/* AI Workout Preview */}
           {aiWorkout && (
-            <div style={{background:C.surface,borderRadius:18,padding:"18px 18px 14px",border:`1px solid rgba(139,164,184,0.2)`,marginBottom:18}}>
+            <div style={{background:C.surface,borderRadius:16,padding:"18px 18px 14px",border:`1px solid rgba(139,164,184,0.2)`,marginBottom:18}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
                 <div>
                   <div style={{fontSize:10,fontWeight:700,color:C.sky,letterSpacing:2.5,textTransform:"uppercase",marginBottom:4}}>AI VORSCHLAG</div>
@@ -2156,7 +2188,7 @@ REGELN FÜR DEINE ANTWORTEN:
             const prev = getPrev(ex.exerciseId);
             const sug = prev ? suggestWeight(ex.exerciseId, prev.sets, [8,12], sLog, recMap[EX.find(e=>e.id===ex.exerciseId)?.m]||100) : null;
             return (
-              <div key={ei} style={{background:C.surface,borderRadius:18,padding:"16px 16px 12px",border:`1px solid ${C.border}`,marginBottom:10,borderLeft:`4px solid ${mg?.color||C.muted}`}}>
+              <div key={ei} style={{background:C.surface,borderRadius:16,padding:"16px 16px 12px",border:`1px solid ${C.border}`,marginBottom:10,borderLeft:`4px solid ${mg?.color||C.muted}`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                   <div onClick={()=>{setSub("history");setDetailEx(ex.exerciseId)}} style={{cursor:"pointer"}}><div style={{fontSize:16,fontWeight:800}}>{def?.name||"?"}</div><div style={{fontSize:11,color:mg?.color,fontWeight:600}}>{mg?.name}</div></div>
                   <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -2321,7 +2353,7 @@ REGELN FÜR DEINE ANTWORTEN:
                 </div>
               </div>
               {trainingDays.map(day=>(
-                <div key={day.id} style={{background:C.surface,borderRadius:18,padding:"16px 18px",border:`1px solid ${C.border}`,marginBottom:10}}>
+                <div key={day.id} style={{background:C.surface,borderRadius:16,padding:"16px 18px",border:`1px solid ${C.border}`,marginBottom:10}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                     <input value={day.name} onChange={e=>updateDayName(day.id,e.target.value)} style={{...inp,textAlign:"left",fontSize:16,fontWeight:800,background:"transparent",border:"none",padding:0,width:"auto"}}/>
                     <div style={{display:"flex",gap:6}}>
@@ -2623,7 +2655,7 @@ REGELN FÜR DEINE ANTWORTEN:
 
       {/* ═══ AI COACH CHAT ═══ */}
       {sub==="coach" && (
-        <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 220px)",maxHeight:"calc(100vh - 220px)"}}>
+        <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 260px)",maxHeight:"calc(100vh - 260px)"}}>
           {/* Chat header */}
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,padding:"12px 16px",background:C.emberBg,borderRadius:16,border:`1px solid ${C.accentBorder}`}}>
             <div style={{width:42,height:42,borderRadius:12,background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🧠</div>

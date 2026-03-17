@@ -328,7 +328,7 @@ export default function App(){
 
   const inp={width:"100%",padding:"13px 16px",background:C.card,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,fontSize:15,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box"};
   const sty = { card: {background:C.surface,borderRadius:20,padding:"18px 14px",border:`1px solid ${C.border}`,marginBottom:14}, label: {fontSize:11,fontWeight:700,color:C.muted,letterSpacing:2,textTransform:"uppercase",marginBottom:14,paddingLeft:4} };
-  const globalStyles = `@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes pop{0%{transform:scale(.95);opacity:0}100%{transform:scale(1);opacity:1}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes glow{0%,100%{box-shadow:0 0 20px rgba(196,149,106,0.05)}50%{box-shadow:0 0 40px rgba(196,149,106,0.12)}}@keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}input[type=range]{accent-color:${C.ember}}::-webkit-scrollbar{width:0;height:0}body{background:#0a0a0f}`;
+  const globalStyles = `@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes pop{0%{transform:scale(.95);opacity:0}100%{transform:scale(1);opacity:1}}@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes glow{0%,100%{box-shadow:0 0 20px rgba(196,149,106,0.05)}50%{box-shadow:0 0 40px rgba(196,149,106,0.12)}}@keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}@keyframes countUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}input[type=range]{accent-color:${C.ember}}::-webkit-scrollbar{width:0;height:0}body{background:#0a0a0f}button:active{transform:scale(0.97)!important;opacity:0.9!important}.card3d{position:relative;transform-style:preserve-3d;perspective:800px;transition:transform 0.4s cubic-bezier(.17,.67,.35,1.2)}.card3d:active{transform:scale(0.96) rotateX(2deg)!important}.card3d-inner{transition:transform 0.35s cubic-bezier(.17,.67,.35,1.2),box-shadow 0.35s ease;will-change:transform}.card3d-inner::after{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,0.08) 0%,transparent 50%,transparent 100%);opacity:0;transition:opacity 0.35s ease;pointer-events:none}.card3d:active .card3d-inner::after{opacity:1}`;
   const fontLink = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap";
   const headFont = "'Cormorant Garamond',serif";
   const bodyFont = "'Manrope',sans-serif";
@@ -367,26 +367,33 @@ export default function App(){
           <div style={{fontSize:38,fontWeight:300,letterSpacing:6,marginBottom:8,animation:"fadeUp 0.5s ease",fontFamily:headFont,textTransform:"uppercase",lineHeight:1}}>Was trainierst du?</div>
           <div style={{fontSize:12,color:C.muted,marginBottom:44,animation:"fadeUp 0.5s ease 0.1s both",letterSpacing:1}}>Wähle deinen Trainingsbereich</div>
 
-          <div style={{display:"flex",flexDirection:"column",gap:14}}>
-            <button onClick={()=>setMode("cardio")} style={{
-              background:C.surface,border:`1px solid ${C.border}`,backdropFilter:"blur(20px)",
-              borderRadius:20,padding:"28px 24px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-              animation:"fadeUp 0.4s ease 0.15s both",transition:"transform 0.15s",
-            }}>
-              <div style={{fontSize:10,fontWeight:700,color:C.ember,letterSpacing:4,marginBottom:6,fontFamily:bodyFont}}>CARDIO</div>
-              <div style={{fontSize:22,fontWeight:300,color:C.text,marginBottom:6,fontFamily:headFont,letterSpacing:2,textTransform:"uppercase"}}>Ausdauer</div>
-              <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>10-Wochen Laufplan, Zone 2, Intervalle</div>
-            </button>
-
-            <button onClick={()=>setMode("strength")} style={{
-              background:C.surface,border:`1px solid ${C.border}`,backdropFilter:"blur(20px)",
-              borderRadius:20,padding:"28px 24px",cursor:"pointer",fontFamily:"inherit",textAlign:"left",
-              animation:"fadeUp 0.4s ease 0.25s both",transition:"transform 0.15s",
-            }}>
-              <div style={{fontSize:10,fontWeight:700,color:C.sky,letterSpacing:4,marginBottom:6,fontFamily:bodyFont}}>KRAFT</div>
-              <div style={{fontSize:22,fontWeight:300,color:C.text,marginBottom:6,fontFamily:headFont,letterSpacing:2,textTransform:"uppercase"}}>Krafttraining</div>
-              <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>Progressive Overload, Split-Tage, Recovery</div>
-            </button>
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            {[
+              {mode:"cardio",icon:"🏃",accent:C.ember,label:"CARDIO",title:"Ausdauer",desc:"10-Wochen Laufplan, Zone 2, Intervalle",delay:"0.15s"},
+              {mode:"strength",icon:"🏋️",accent:C.sky,label:"KRAFT",title:"Krafttraining",desc:"Progressive Overload, Split-Tage, Recovery",delay:"0.25s"},
+            ].map(item => (
+              <div key={item.mode} className="card3d" style={{animation:`fadeUp 0.4s ease ${item.delay} both`}}
+                onTouchStart={e=>{const el=e.currentTarget.querySelector('.card3d-inner');if(el){el.style.transform='rotateX(3deg) rotateY(-2deg) scale(1.02)';el.style.boxShadow=`0 12px 40px rgba(0,0,0,0.4), 0 0 30px ${item.accent}15`}}}
+                onTouchEnd={e=>{const el=e.currentTarget.querySelector('.card3d-inner');if(el){el.style.transform='';el.style.boxShadow=''}}}
+              >
+                <div className="card3d-inner" onClick={()=>setMode(item.mode)} style={{
+                  background:`linear-gradient(145deg, ${C.surface}, rgba(18,18,26,0.95))`,
+                  border:`1px solid ${C.border}`,borderRadius:20,padding:"24px 24px 20px",
+                  cursor:"pointer",fontFamily:"inherit",textAlign:"left",position:"relative",overflow:"hidden",
+                }}>
+                  <div style={{position:"absolute",top:0,right:0,width:120,height:120,background:`radial-gradient(circle at 80% 20%, ${item.accent}08, transparent 70%)`,pointerEvents:"none"}} />
+                  <div style={{display:"flex",alignItems:"flex-start",gap:16,position:"relative"}}>
+                    <div style={{width:48,height:48,borderRadius:14,background:`linear-gradient(135deg, ${item.accent}18, ${item.accent}08)`,border:`1px solid ${item.accent}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{item.icon}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,fontWeight:700,color:item.accent,letterSpacing:4,marginBottom:4,fontFamily:bodyFont}}>{item.label}</div>
+                      <div style={{fontSize:20,fontWeight:300,color:C.text,marginBottom:6,fontFamily:headFont,letterSpacing:2,textTransform:"uppercase"}}>{item.title}</div>
+                      <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>{item.desc}</div>
+                    </div>
+                    <div style={{color:C.dim,fontSize:18,marginTop:4}}>›</div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
