@@ -605,6 +605,9 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const [summary, setSummary] = useState(null); // workout summary after finish
   const [aiWorkout, setAiWorkout] = useState(null); // AI-generated workout preview
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiCoach, setAiCoach] = useState(null); // AI post-workout coaching tips
+  const [aiCoachLoading, setAiCoachLoading] = useState(false);
+  const [aiCoachExpanded, setAiCoachExpanded] = useState(false);
   const timerRef = useRef(null);
 
   // ═══ PERSIST ACTIVE WORKOUT ═══
@@ -825,6 +828,100 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
     setSub("log");
   };
 
+  // ═══ AI COACH — POST-WORKOUT ANALYSIS ═══
+  const generateAiCoach = async (completedWorkout, summaryInfo) => {
+    const apiKey = getAiKey();
+    if (!apiKey) return; // silently skip if no key
+
+    const baseUrl = apiKey.startsWith("ak-") ? "https://api.moonshot.cn/v1" : "https://api.moonshot.ai/v1";
+
+    setAiCoachLoading(true);
+    setAiCoach(null);
+    setAiCoachExpanded(false);
+    try {
+      // Build per-exercise analysis data
+      const exerciseAnalysis = completedWorkout.exercises.map(ex => {
+        const def = ALL_EX.find(e => e.id === ex.exerciseId);
+        const name = def?.name || ex.exerciseId;
+        const mg = def ? (MG.find(m => m.id === def.m)?.name || def.m) : "?";
+        const workSets = ex.sets.filter(s => s.type !== "W");
+        const setsStr = workSets.map(s => `${s.weight}kg×${s.reps}${s.rpe ? ` RPE${s.rpe}` : ""}${s.type !== "N" ? ` [${s.type}]` : ""}`).join(", ");
+
+        // History: last 6 sessions for this exercise
+        const history = sLog
+          .filter(w => w.exercises?.some(e => e.exerciseId === ex.exerciseId))
+          .slice(0, 6)
+          .map(w => {
+            const prev = w.exercises.find(e => e.exerciseId === ex.exerciseId);
+            const pSets = (prev?.sets || []).filter(s => s.type !== "W");
+            const maxW = Math.max(0, ...pSets.map(s => s.weight || 0));
+            const best1rm = Math.max(0, ...pSets.map(s => est1RM(s.weight, s.reps)));
+            const vol = pSets.reduce((a, s) => a + (s.weight || 0) * (s.reps || 0), 0);
+            return `${w.date}: max ${maxW}kg, est1RM ${best1rm}kg, vol ${Math.round(vol)}kg`;
+          }).join(" | ");
+
+        return `• ${name} (${mg}): ${setsStr}\n  Historie: ${history || "Keine vorherigen Daten"}`;
+      }).join("\n");
+
+      const prompt = `Du bist ein erfahrener Krafttraining-Coach. Analysiere dieses gerade abgeschlossene Workout und gib konkrete, personalisierte Tipps.
+
+HEUTIGES WORKOUT (${summaryInfo.date}):
+Dauer: ${summaryInfo.duration} Min | Sätze: ${summaryInfo.totalSets} | Volumen: ${Math.round(summaryInfo.totalVol/1000*10)/10}t
+${summaryInfo.prs.length ? `Neue PRs: ${summaryInfo.prs.map(p => `${p.name}: ${p.value}`).join(", ")}` : "Keine neuen PRs."}
+
+ÜBUNGEN MIT HISTORIE:
+${exerciseAnalysis}
+
+ANALYSE-AUFTRAG:
+1. Erkenne Stagnation: Wenn Gewicht/1RM bei einer Übung seit 3+ Sessions nicht gestiegen ist, schlage konkrete Techniken vor (Pause Reps, Cluster Sets, Griffvariation, Tempo-Änderung, etc.)
+2. RPE-Feedback: Wenn RPE durchgehend >8.5, empfehle ggf. leichtere Gewichte mit mehr Wiederholungen. Wenn RPE sehr niedrig (<6), empfehle Gewichtssteigerung.
+3. Volumen-Check: Bewerte ob das Volumen pro Muskelgruppe angemessen ist.
+4. Konkrete Progression: Sage genau, welches Gewicht nächstes Mal versucht werden sollte (basierend auf den Inkrementen).
+5. Technik-Tipps: 1-2 spezifische Cues für die Hauptübungen.
+
+FORMAT — Antworte NUR mit JSON, kein anderer Text:
+{
+  "headline": "Kurze Bewertung in 3-5 Worten (z.B. 'Solides Push-Training!' oder 'Stagnation bei Bench!')",
+  "tips": [
+    {"exercise": "Übungsname", "type": "stagnation|progression|technik|volumen|rpe", "tip": "Konkreter Tipp auf Deutsch, max 2 Sätze."}
+  ],
+  "overall": "1-2 Sätze Gesamtbewertung mit dem wichtigsten Takeaway für nächstes Mal."
+}
+
+Maximal 5 Tips. Nur relevante Tipps, kein Füllmaterial. Sei direkt und spezifisch.`;
+
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "moonshot-v1-8k",
+          temperature: 0.5,
+          max_tokens: 1200,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+
+      if (!response.ok) throw new Error(`API ${response.status}`);
+
+      const resData = await response.json();
+      const text = resData.choices?.[0]?.message?.content || "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("No JSON");
+
+      const result = JSON.parse(jsonMatch[0]);
+      setAiCoach(result);
+      setAiCoachExpanded(true);
+    } catch (err) {
+      console.error("AI Coach error:", err);
+      // silently fail — the summary still shows without AI tips
+    } finally {
+      setAiCoachLoading(false);
+    }
+  };
+
   const addEx = (eid) => {
     if (!active) return;
     setActive(p => ({ ...p, exercises: [...p.exercises, { exerciseId: eid, sets: mkSets(eid) }] }));
@@ -896,6 +993,8 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
     save([...sLog, cleaned].sort((a, b) => b.date.localeCompare(a.date)), undefined, undefined);
     setActive(null); setRestStart(null);
     setSummary(summaryData);
+    // Fire AI Coach analysis in background
+    generateAiCoach(cleaned, summaryData);
   };
 
   const saveTmpl = () => { if (!active || !tmplName.trim()) return; save(undefined, [...templates, { id: Date.now().toString(), name: tmplName.trim(), exercises: active.exercises.map(e => ({ exerciseId: e.exerciseId, sets: e.sets.map(s => ({weight:+s.weight||0,reps:+s.reps||0,type:s.type||"N"})) })) }], undefined); setTmplName(""); };
@@ -1366,7 +1465,7 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
       {/* ═══ WORKOUT SUMMARY ═══ */}
       {summary && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setSummary(null)}>
-          <div style={{background:C.surface,borderRadius:24,padding:"28px 24px",border:`1px solid ${summary.prs.length?C.gold:C.border}`,maxWidth:380,width:"100%",textAlign:"center",animation:"pop 0.3s ease",boxShadow:summary.prs.length?`0 0 40px ${C.gold}33`:undefined}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:C.surface,borderRadius:24,padding:"28px 24px",border:`1px solid ${summary.prs.length?C.gold:C.border}`,maxWidth:380,width:"100%",textAlign:"center",animation:"pop 0.3s ease",boxShadow:summary.prs.length?`0 0 40px ${C.gold}33`:undefined,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:42,marginBottom:8}}>{summary.prs.length ? "\u{1F3C6}" : "\u{1F4AA}"}</div>
             <div style={{fontSize:24,fontWeight:900,marginBottom:4}}>Workout fertig!</div>
             <div style={{fontSize:13,color:C.muted,marginBottom:20}}>{summary.date}</div>
@@ -1394,7 +1493,54 @@ Antworte NUR mit einem JSON-Objekt, kein anderer Text:
               </div>
             )}
 
-            <button onClick={()=>setSummary(null)} style={{width:"100%",padding:"14px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Weiter</button>
+            {/* ═══ AI COACH ANALYSIS ═══ */}
+            {(aiCoachLoading || aiCoach) && (
+              <div style={{marginBottom:16,textAlign:"left"}}>
+                <div
+                  onClick={() => aiCoach && setAiCoachExpanded(p => !p)}
+                  style={{display:"flex",alignItems:"center",gap:8,cursor:aiCoach?"pointer":"default",padding:"10px 14px",background:aiCoach ? "rgba(196,149,106,0.08)" : C.card,borderRadius:14,border:`1px solid ${aiCoach ? C.accentBorder : C.border}`,transition:"all 0.3s ease"}}
+                >
+                  <span style={{fontSize:18}}>{aiCoachLoading ? "⏳" : "🧠"}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:10,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.ember,marginBottom:2}}>AI COACH</div>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>
+                      {aiCoachLoading ? "Analysiere dein Workout..." : (aiCoach?.headline || "Analyse fertig")}
+                    </div>
+                  </div>
+                  {aiCoach && <span style={{fontSize:14,color:C.muted,transform:aiCoachExpanded?"rotate(180deg)":"rotate(0)",transition:"transform 0.2s"}}>▼</span>}
+                </div>
+
+                {aiCoach && aiCoachExpanded && (
+                  <div style={{marginTop:8,animation:"slideDown 0.2s ease"}}>
+                    {/* Tips */}
+                    {(aiCoach.tips || []).map((tip, i) => {
+                      const typeColors = {stagnation: C.gold, progression: C.lime, technik: C.sky, volumen: C.violet, rpe: C.ember};
+                      const typeLabels = {stagnation: "STAGNATION", progression: "PROGRESSION", technik: "TECHNIK", volumen: "VOLUMEN", rpe: "RPE"};
+                      const col = typeColors[tip.type] || C.muted;
+                      return (
+                        <div key={i} style={{background:C.card,borderRadius:12,padding:"10px 14px",marginBottom:6,borderLeft:`3px solid ${col}`}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                            <span style={{fontSize:9,fontWeight:800,letterSpacing:1.5,color:col,textTransform:"uppercase"}}>{typeLabels[tip.type] || tip.type}</span>
+                            <span style={{fontSize:11,color:C.sub,fontWeight:600}}>— {tip.exercise}</span>
+                          </div>
+                          <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{tip.tip}</div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Overall */}
+                    {aiCoach.overall && (
+                      <div style={{background:"rgba(196,149,106,0.06)",borderRadius:12,padding:"10px 14px",marginTop:4,border:`1px solid ${C.accentBorder}`}}>
+                        <div style={{fontSize:9,fontWeight:700,letterSpacing:2,color:C.ember,marginBottom:4}}>FAZIT</div>
+                        <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{aiCoach.overall}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button onClick={()=>{setSummary(null);setAiCoach(null);setAiCoachExpanded(false);}} style={{width:"100%",padding:"14px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Weiter</button>
           </div>
         </div>
       )}
