@@ -611,6 +611,11 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const [aiSwap, setAiSwap] = useState(null); // {exerciseIndex, loading, suggestions}
   const [aiWeakness, setAiWeakness] = useState(null); // weakness analysis result
   const [aiWeaknessLoading, setAiWeaknessLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]); // [{role:"user"|"assistant", content:"..."}]
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef(null);
+  const chatInputRef = useRef(null);
   const timerRef = useRef(null);
 
   // ═══ PERSIST ACTIVE WORKOUT ═══
@@ -1095,6 +1100,177 @@ Maximal 4 Schwachstellen, 2 Imbalances. Sei konkret und spezifisch.`;
       alert("Schwachstellen-Analyse fehlgeschlagen: " + err.message);
     } finally {
       setAiWeaknessLoading(false);
+    }
+  };
+
+  // ═══ AI COACH CHAT ═══
+  useEffect(() => {
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, chatLoading]);
+
+  const buildCoachSystemPrompt = () => {
+    // Recovery status
+    const recoveryInfo = MG.map(m => `${m.name}: ${recMap[m.id] ?? 100}%`).join(", ");
+
+    // Last 8 workouts summary
+    const recentWorkouts = sLog.slice(0, 8).map(w => {
+      const exs = (w.exercises || []).map(ex => {
+        const def = ALL_EX.find(e => e.id === ex.exerciseId);
+        const workSets = (ex.sets || []).filter(s => s.type !== "W");
+        const maxW = Math.max(0, ...workSets.map(s => s.weight || 0));
+        const best1rm = Math.max(0, ...workSets.map(s => est1RM(s.weight, s.reps)));
+        const vol = workSets.reduce((a, s) => a + (s.weight || 0) * (s.reps || 0), 0);
+        const setsStr = workSets.map(s => `${s.weight}×${s.reps}${s.rpe ? ` @RPE${s.rpe}` : ""}`).join(", ");
+        return `  • ${def?.name || ex.exerciseId}: ${setsStr} | Max: ${maxW}kg, est1RM: ${best1rm}kg, Vol: ${Math.round(vol)}kg`;
+      }).join("\n");
+      const muscles = [...new Set((w.exercises || []).map(e => ALL_EX.find(x => x.id === e.exerciseId)?.m).filter(Boolean))];
+      const mgNames = muscles.map(mid => MG.find(m => m.id === mid)?.name || mid);
+      return `📅 ${w.date} (${w.duration || "?"}min) — ${mgNames.join(", ")}:\n${exs}`;
+    }).join("\n\n");
+
+    // Split/Training days
+    const splitInfo = trainingDays.length > 0
+      ? trainingDays.map(d => `${d.name}: ${d.exercises.map(eid => ALL_EX.find(e => e.id === eid)?.name || eid).join(", ")}`).join("\n")
+      : "Kein fester Split definiert.";
+
+    // Weekly volume per muscle
+    const weekVolInfo = MG.filter(m => weekVol[m.id] > 0).map(m => `${m.name}: ${Math.round(weekVol[m.id] / 1000 * 10) / 10}t`).join(", ");
+
+    // PR data — best 1RM per exercise across all history
+    const prData = {};
+    sLog.forEach(w => (w.exercises || []).forEach(ex => {
+      const best = Math.max(0, ...(ex.sets || []).filter(s => s.type !== "W").map(s => est1RM(s.weight, s.reps)));
+      if (best > (prData[ex.exerciseId] || 0)) prData[ex.exerciseId] = best;
+    }));
+    const topPRs = Object.entries(prData)
+      .map(([id, val]) => ({ name: ALL_EX.find(e => e.id === id)?.name || id, val }))
+      .sort((a, b) => b.val - a.val)
+      .slice(0, 15)
+      .map(p => `${p.name}: ${p.val}kg`).join(", ");
+
+    // Stagnation detection per exercise (last 4 sessions)
+    const stagnationInfo = [];
+    const exerciseIds = [...new Set(sLog.slice(0, 20).flatMap(w => (w.exercises || []).map(e => e.exerciseId)))];
+    exerciseIds.forEach(eid => {
+      const sessions = sLog
+        .filter(w => w.exercises?.some(e => e.exerciseId === eid))
+        .slice(0, 4)
+        .map(w => {
+          const ex = w.exercises.find(e => e.exerciseId === eid);
+          return Math.max(0, ...(ex?.sets || []).filter(s => s.type !== "W").map(s => est1RM(s.weight, s.reps)));
+        });
+      if (sessions.length >= 3) {
+        const allSame = sessions.every(v => Math.abs(v - sessions[0]) < 1);
+        const declining = sessions.length >= 3 && sessions[0] < sessions[sessions.length - 1];
+        if (allSame) stagnationInfo.push(`${ALL_EX.find(e => e.id === eid)?.name || eid}: Stagnation (${sessions[0]}kg 1RM seit ${sessions.length} Sessions)`);
+        if (declining) stagnationInfo.push(`${ALL_EX.find(e => e.id === eid)?.name || eid}: Rückgang (${sessions[sessions.length-1]}→${sessions[0]}kg)`);
+      }
+    });
+
+    // Gamification
+    const totalWorkouts = sLog.length;
+    const totalVolumeAll = sLog.reduce((a, w) => a + (w.exercises || []).reduce((b, ex) => b + (ex.sets || []).filter(s => s.type !== "W").reduce((c, s) => c + (s.weight || 0) * (s.reps || 0), 0), 0), 0);
+
+    // Deload signals
+    const deloadInfo = deloadAdvice ? `Deload-Warnung aktiv: Severity ${deloadAdvice.severity}, Gründe: ${deloadAdvice.reasons?.join(", ")}` : "Kein Deload nötig.";
+
+    // Available exercises summary
+    const eqNames = userEquipment.map(id => EQUIPMENT.find(e => e.id === id)?.name || id).join(", ");
+
+    return `Du bist ein erfahrener, deutschsprachiger Krafttraining-Coach namens "Coach". Du sprichst den Athleten direkt und motivierend an — wie ein kompetenter Trainingspartner, nicht wie ein Roboter.
+
+DEINE PERSÖNLICHKEIT:
+- Direkt, ehrlich, kompetent — kein Geschwafel
+- Motivierend aber realistisch
+- Du duzt den Athleten
+- Antworte auf Deutsch, nutze Fachbegriffe wo angebracht
+- Halte Antworten prägnant (max 150 Wörter), außer der Athlet fragt explizit nach Details
+- Nutze gelegentlich Emojis für Übersichtlichkeit (💪🔥📈⚠️), aber nicht übertreiben
+
+ATHLETEN-PROFIL:
+- Name: Maximilian, 22 Jahre
+- Trainiert 5-6x pro Woche (Kraft + gelegentlich Cardio)
+- Gesamt-Workouts im Log: ${totalWorkouts}
+- Gesamtvolumen: ${Math.round(totalVolumeAll / 1000)}t (Tonnen)
+- Equipment: ${eqNames}
+
+AKTUELLER RECOVERY-STATUS (100% = voll erholt):
+${recoveryInfo}
+
+VOLUMEN LETZTE 7 TAGE:
+${weekVolInfo || "Keine Daten."}
+
+AKTUELLE BEST-PRs (est. 1RM):
+${topPRs || "Keine Daten."}
+
+${stagnationInfo.length ? `⚠️ STAGNATION/RÜCKGANG ERKANNT:\n${stagnationInfo.join("\n")}` : "Keine Stagnation erkannt."}
+
+${deloadInfo}
+
+SPLIT-MUSTER:
+${splitInfo}
+
+LETZTE WORKOUTS (neueste zuerst):
+${recentWorkouts || "Keine bisherigen Workouts."}
+
+REGELN FÜR DEINE ANTWORTEN:
+1. Nutze IMMER die echten Daten oben. Erfinde keine Zahlen.
+2. Wenn du eine Übung empfiehlst, nutze Übungen aus dem System des Athleten.
+3. Bei Fragen zu Stagnation: Analysiere die 1RM-Trends in den Daten und schlage spezifische Techniken vor (Pause Reps, Drop Sets, Cluster Sets, Tempo-Variationen, Griffwechsel etc.)
+4. Bei Fragen zu Recovery: Schau auf die Recovery-% und empfehle entsprechend.
+5. Bei Fragen zu Volumen/Split: Nutze die Wochenvolumen-Daten und Split-Info.
+6. Bei Ernährungsfragen: Gib allgemeine, evidenzbasierte Empfehlungen. Du bist kein Ernährungsberater — sage das bei medizinischen Fragen.
+7. Wenn der Athlet fragt was er heute trainieren soll: Analysiere Recovery + letzte Workouts + Split-Muster und schlage einen konkreten Plan vor.
+8. Bei Plateau-Fragen: Sei spezifisch — nenne die Übung, den aktuellen 1RM, wie lange es stagniert, und 2-3 konkrete Interventionen.
+9. Du kannst auch mal humorvoll sein oder den Athleten challengen ("Die Beine kommen zu kurz — keine Ausreden 🦵").`;
+  };
+
+  const sendChatMessage = async () => {
+    const msg = chatInput.trim();
+    if (!msg || chatLoading) return;
+
+    const apiKey = getAiKey();
+    if (!apiKey) { alert("Kein AI API-Key hinterlegt. Gehe zu Daten → AI API-Key eingeben."); return; }
+    const baseUrl = apiKey.startsWith("ak-") ? "https://api.moonshot.cn/v1" : "https://api.moonshot.ai/v1";
+
+    const newMessages = [...chatMessages, { role: "user", content: msg }];
+    setChatMessages(newMessages);
+    setChatInput("");
+    setChatLoading(true);
+
+    try {
+      // Build API messages: system + last 10 messages for context window
+      const systemPrompt = buildCoachSystemPrompt();
+      const contextMessages = newMessages.slice(-10);
+      const apiMessages = [
+        { role: "system", content: systemPrompt },
+        ...contextMessages,
+      ];
+
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "moonshot-v1-8k",
+          temperature: 0.6,
+          max_tokens: 800,
+          messages: apiMessages,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`API ${response.status}: ${err.slice(0, 100)}`);
+      }
+
+      const resData = await response.json();
+      const reply = resData.choices?.[0]?.message?.content || "Keine Antwort erhalten.";
+      setChatMessages(prev => [...prev, { role: "assistant", content: reply }]);
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: "assistant", content: `⚠️ Fehler: ${err.message}` }]);
+    } finally {
+      setChatLoading(false);
+      setTimeout(() => chatInputRef.current?.focus(), 100);
     }
   };
 
@@ -1774,7 +1950,7 @@ Maximal 4 Schwachstellen, 2 Imbalances. Sei konkret und spezifisch.`;
 
     <div style={{padding:"22px 20px 48px",animation:"fadeIn 0.35s ease"}}>
       <div style={{display:"flex",gap:0,marginBottom:20,borderBottom:`1px solid ${C.border}`}}>
-        {[["log","Workout"],["days","Tage"],["history","Verlauf"],["muscles","Muskeln"]].map(([k,l])=>(
+        {[["log","Workout"],["days","Tage"],["history","Verlauf"],["muscles","Muskeln"],["coach","Coach"]].map(([k,l])=>(
           <button key={k} onClick={()=>setSub(k)} style={{flex:1,padding:"12px 0 10px",background:"transparent",border:"none",borderBottom:sub===k?`2px solid ${C.ember}`:"2px solid transparent",color:sub===k?C.text:C.dim,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2.5,textTransform:"uppercase",transition:"all 0.3s"}}>{l}</button>
         ))}
       </div>
@@ -2441,6 +2617,112 @@ Maximal 4 Schwachstellen, 2 Imbalances. Sei konkret und spezifisch.`;
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ AI COACH CHAT ═══ */}
+      {sub==="coach" && (
+        <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 220px)",maxHeight:"calc(100vh - 220px)"}}>
+          {/* Chat header */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,padding:"12px 16px",background:C.emberBg,borderRadius:16,border:`1px solid ${C.accentBorder}`}}>
+            <div style={{width:42,height:42,borderRadius:12,background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🧠</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:15,fontWeight:800,color:C.text,fontFamily:"'Cormorant Garamond',serif",letterSpacing:1,textTransform:"uppercase"}}>AI Coach</div>
+              <div style={{fontSize:11,color:C.sub}}>Dein persönlicher Trainingsberater</div>
+            </div>
+            {chatMessages.length > 0 && (
+              <button onClick={()=>setChatMessages([])} style={{padding:"6px 12px",background:C.card,border:`1px solid ${C.border}`,borderRadius:8,color:C.muted,fontSize:10,fontWeight:600,cursor:"pointer",letterSpacing:1,textTransform:"uppercase"}}>Reset</button>
+            )}
+          </div>
+
+          {/* Chat messages area */}
+          <div style={{flex:1,overflowY:"auto",marginBottom:12,padding:"0 2px",WebkitOverflowScrolling:"touch"}}>
+            {chatMessages.length === 0 && !chatLoading && (
+              <div style={{textAlign:"center",padding:"40px 20px"}}>
+                <div style={{fontSize:42,marginBottom:12}}>💬</div>
+                <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:8}}>Frag deinen Coach!</div>
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.6,marginBottom:24}}>
+                  Der Coach kennt dein komplettes Trainingslog, Recovery-Status,{"\n"}Split und PRs — frag ihn alles rund ums Training.
+                </div>
+                {/* Quick prompts */}
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {[
+                    "Was soll ich heute trainieren?",
+                    "Wie breche ich mein Bench-Plateau?",
+                    "Wie sieht mein Volumen diese Woche aus?",
+                    "Welche Muskeln vernachlässige ich?",
+                  ].map((q, i) => (
+                    <button key={i} onClick={()=>{setChatInput(q);setTimeout(()=>{const el=chatInputRef.current;if(el)el.focus();},50)}}
+                      style={{padding:"10px 16px",background:C.card,border:`1px solid ${C.borderLight}`,borderRadius:12,color:C.sub,fontSize:12,cursor:"pointer",textAlign:"left",fontFamily:"inherit",transition:"all 0.15s"}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor=C.ember;e.currentTarget.style.color=C.text}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor=C.borderLight;e.currentTarget.style.color=C.sub}}>
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {chatMessages.map((msg, i) => (
+              <div key={i} style={{display:"flex",justifyContent:msg.role==="user"?"flex-end":"flex-start",marginBottom:10}}>
+                <div style={{
+                  maxWidth:"85%",
+                  padding:"10px 14px",
+                  borderRadius:msg.role==="user"?"16px 16px 4px 16px":"16px 16px 16px 4px",
+                  background:msg.role==="user"?`linear-gradient(135deg, ${C.ember}, #a87a52)`:C.surface,
+                  color:msg.role==="user"?"#0a0a0f":C.text,
+                  border:msg.role==="user"?"none":`1px solid ${C.border}`,
+                  fontSize:13,
+                  lineHeight:1.6,
+                  whiteSpace:"pre-wrap",
+                  wordBreak:"break-word",
+                  fontWeight:msg.role==="user"?600:400,
+                }}>
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+
+            {chatLoading && (
+              <div style={{display:"flex",justifyContent:"flex-start",marginBottom:10}}>
+                <div style={{padding:"12px 18px",borderRadius:"16px 16px 16px 4px",background:C.surface,border:`1px solid ${C.border}`}}>
+                  <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                    {[0,1,2].map(d => (
+                      <div key={d} style={{width:7,height:7,borderRadius:"50%",background:C.ember,opacity:0.5,animation:`pulse 1.2s ease-in-out ${d*0.2}s infinite`}} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat input */}
+          <div style={{display:"flex",gap:8,alignItems:"flex-end",padding:"8px 0 4px",borderTop:`1px solid ${C.border}`}}>
+            <textarea
+              ref={chatInputRef}
+              value={chatInput}
+              onChange={e=>{setChatInput(e.target.value);e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,120)+"px"}}
+              onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChatMessage()}}}
+              placeholder="Frag deinen Coach..."
+              rows={1}
+              style={{
+                flex:1,padding:"12px 16px",background:C.card,border:`1px solid ${C.borderLight}`,borderRadius:14,
+                color:C.text,fontSize:14,fontFamily:"'Manrope',sans-serif",resize:"none",outline:"none",
+                lineHeight:1.5,maxHeight:120,
+              }}
+              onFocus={e=>e.target.style.borderColor=C.ember}
+              onBlur={e=>e.target.style.borderColor=C.borderLight}
+            />
+            <button onClick={sendChatMessage} disabled={chatLoading || !chatInput.trim()}
+              style={{
+                width:44,height:44,borderRadius:12,border:"none",cursor:chatLoading||!chatInput.trim()?"default":"pointer",
+                background:chatInput.trim()&&!chatLoading?`linear-gradient(135deg, ${C.ember}, #a87a52)`:C.card,
+                color:chatInput.trim()&&!chatLoading?"#0a0a0f":C.dim,
+                fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                transition:"all 0.2s",
+              }}>↑</button>
           </div>
         </div>
       )}
