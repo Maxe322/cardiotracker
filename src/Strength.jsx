@@ -608,6 +608,9 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const [aiCoach, setAiCoach] = useState(null); // AI post-workout coaching tips
   const [aiCoachLoading, setAiCoachLoading] = useState(false);
   const [aiCoachExpanded, setAiCoachExpanded] = useState(false);
+  const [aiSwap, setAiSwap] = useState(null); // {exerciseIndex, loading, suggestions}
+  const [aiWeakness, setAiWeakness] = useState(null); // weakness analysis result
+  const [aiWeaknessLoading, setAiWeaknessLoading] = useState(false);
   const timerRef = useRef(null);
 
   // ═══ PERSIST ACTIVE WORKOUT ═══
@@ -919,6 +922,179 @@ Maximal 5 Tips. Nur relevante Tipps, kein Füllmaterial. Sei direkt und spezifis
       // silently fail — the summary still shows without AI tips
     } finally {
       setAiCoachLoading(false);
+    }
+  };
+
+  // ═══ AI EXERCISE SWAP ═══
+  const generateAiSwap = async (exerciseIndex) => {
+    const apiKey = getAiKey();
+    if (!apiKey) { alert("Kein AI API-Key hinterlegt. Gehe zu Daten → AI API-Key eingeben."); return; }
+    if (!active) return;
+
+    const baseUrl = apiKey.startsWith("ak-") ? "https://api.moonshot.cn/v1" : "https://api.moonshot.ai/v1";
+    const ex = active.exercises[exerciseIndex];
+    const def = ALL_EX.find(e => e.id === ex.exerciseId);
+    if (!def) return;
+
+    setAiSwap({ exerciseIndex, loading: true, suggestions: null });
+    try {
+      const mgName = MG.find(m => m.id === def.m)?.name || def.m;
+      const secMuscles = (def.s || []).map(sid => MG.find(m => m.id === sid)?.name || sid).join(", ");
+      const currentExIds = active.exercises.map(e => e.exerciseId);
+
+      const availAlts = availableEx
+        .filter(e => e.m === def.m && e.id !== def.id && !currentExIds.includes(e.id))
+        .map(e => `${e.id} | ${e.name} | Eq: ${e.eq.join(",")}`).join("\n");
+
+      const prompt = `Du bist ein Krafttraining-Coach. Der Athlet braucht eine Alternative für eine Übung (Gerät besetzt/Variation gewünscht).
+
+AKTUELLE ÜBUNG: ${def.name}
+- Hauptmuskel: ${mgName}
+- Sekundär: ${secMuscles || "keine"}
+- Equipment: ${def.eq.join(", ")}
+
+VERFÜGBARE ALTERNATIVEN (gleiche Muskelgruppe, verfügbares Equipment):
+${availAlts || "Keine direkte Alternative im gleichen Muskel."}
+
+AKTUELLES WORKOUT (diese Übungen sind bereits drin, NICHT nochmal vorschlagen):
+${currentExIds.map(id => ALL_EX.find(e => e.id === id)?.name || id).join(", ")}
+
+Schlage 2-3 Alternativen vor. Priorisiere:
+1. Gleiche Bewegungsebene und Muskelaktivierung
+2. Ähnliche Sekundärmuskeln
+3. Verfügbares Equipment des Athleten
+
+Antworte NUR mit JSON:
+{
+  "alternatives": [
+    {"id": "exercise_id", "reason": "Kurze Begründung auf Deutsch, max 1 Satz"}
+  ]
+}`;
+
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: "moonshot-v1-8k", temperature: 0.4, max_tokens: 600, messages: [{ role: "user", content: prompt }] }),
+      });
+
+      if (!response.ok) throw new Error(`API ${response.status}`);
+      const resData = await response.json();
+      const text = resData.choices?.[0]?.message?.content || "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("No JSON");
+
+      const result = JSON.parse(jsonMatch[0]);
+      const valid = (result.alternatives || []).filter(a => ALL_EX.some(e => e.id === a.id));
+      if (!valid.length) throw new Error("Keine gültigen Alternativen");
+
+      setAiSwap({ exerciseIndex, loading: false, suggestions: valid });
+    } catch (err) {
+      alert("AI Swap fehlgeschlagen: " + err.message);
+      setAiSwap(null);
+    }
+  };
+
+  const applySwap = (exerciseIndex, newExId) => {
+    if (!active) return;
+    setActive(p => ({
+      ...p,
+      exercises: p.exercises.map((e, i) => i !== exerciseIndex ? e : { exerciseId: newExId, sets: mkSets(newExId) })
+    }));
+    setAiSwap(null);
+  };
+
+  // ═══ AI WEAKNESS ANALYSIS ═══
+  const generateWeaknessAnalysis = async () => {
+    const apiKey = getAiKey();
+    if (!apiKey) { alert("Kein AI API-Key hinterlegt. Gehe zu Daten → AI API-Key eingeben."); return; }
+
+    const baseUrl = apiKey.startsWith("ak-") ? "https://api.moonshot.cn/v1" : "https://api.moonshot.ai/v1";
+
+    setAiWeaknessLoading(true);
+    setAiWeakness(null);
+    try {
+      // Aggregate volume per muscle over last 4 weeks
+      const fourWeeksAgo = new Date(); fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+      const recentLogs = sLog.filter(w => w.date >= fourWeeksAgo.toISOString().slice(0, 10));
+
+      const muscleVol = {};
+      const muscleSets = {};
+      const muscleFreq = {}; // unique workout days per muscle
+      MG.forEach(m => { muscleVol[m.id] = 0; muscleSets[m.id] = 0; muscleFreq[m.id] = new Set(); });
+
+      recentLogs.forEach(w => {
+        (w.exercises || []).forEach(ex => {
+          const def = ALL_EX.find(e => e.id === ex.exerciseId);
+          if (!def) return;
+          const workSets = (ex.sets || []).filter(s => s.type !== "W");
+          const vol = workSets.reduce((a, s) => a + (s.weight || 0) * (s.reps || 0), 0);
+          const sets = workSets.length;
+          // Primary
+          muscleVol[def.m] = (muscleVol[def.m] || 0) + vol;
+          muscleSets[def.m] = (muscleSets[def.m] || 0) + sets;
+          muscleFreq[def.m]?.add(w.date);
+          // Secondary (half credit)
+          (def.s || []).forEach(sm => {
+            muscleVol[sm] = (muscleVol[sm] || 0) + vol * 0.3;
+            muscleSets[sm] = (muscleSets[sm] || 0) + sets * 0.5;
+            muscleFreq[sm]?.add(w.date);
+          });
+        });
+      });
+
+      const muscleStats = MG.map(m => `${m.name}: ${Math.round(muscleVol[m.id]/1000*10)/10}t Volumen, ${Math.round(muscleSets[m.id])} Sätze, ${muscleFreq[m.id]?.size || 0}x trainiert`).join("\n");
+
+      const splitInfo = trainingDays.length > 0
+        ? trainingDays.map(d => `${d.name}: ${d.exercises.map(eid => ALL_EX.find(e => e.id === eid)?.name || eid).join(", ")}`).join("\n")
+        : "Kein fester Split.";
+
+      const prompt = `Du bist ein erfahrener Krafttraining-Coach. Analysiere das Trainingsvolumen der letzten 4 Wochen und identifiziere Schwachstellen.
+
+VOLUMEN PRO MUSKELGRUPPE (letzte 4 Wochen):
+${muscleStats}
+
+SPLIT-MUSTER:
+${splitInfo}
+
+ANZAHL WORKOUTS (4 Wochen): ${recentLogs.length}
+
+ANALYSE-AUFTRAG:
+1. Identifiziere 2-4 untertrainierte Muskelgruppen (zu wenig Volumen/Frequenz im Verhältnis)
+2. Identifiziere ggf. übertrainierte Muskelgruppen
+3. Bewerte die Balance (z.B. Push vs Pull, Vorder- vs Rückseite, Ober- vs Unterkörper)
+4. Gib konkrete Empfehlungen: welche Übungen hinzufügen, Sätze pro Woche anpassen, Split-Änderungen
+
+Antworte NUR mit JSON:
+{
+  "headline": "Kurze Zusammenfassung (3-6 Worte, z.B. 'Rücken und Beine vernachlässigt')",
+  "weaknesses": [
+    {"muscle": "Muskelgruppe", "severity": "low|medium|high", "issue": "Was genau fehlt", "fix": "Konkrete Empfehlung mit Übungen und Sätzen"}
+  ],
+  "imbalances": [
+    {"pair": "z.B. Push vs Pull", "ratio": "z.B. 2:1", "recommendation": "Empfehlung"}
+  ],
+  "overall": "2-3 Sätze Gesamtbewertung mit den wichtigsten Änderungen."
+}
+
+Maximal 4 Schwachstellen, 2 Imbalances. Sei konkret und spezifisch.`;
+
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: "moonshot-v1-8k", temperature: 0.4, max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
+      });
+
+      if (!response.ok) throw new Error(`API ${response.status}`);
+      const resData = await response.json();
+      const text = resData.choices?.[0]?.message?.content || "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("No JSON");
+
+      setAiWeakness(JSON.parse(jsonMatch[0]));
+    } catch (err) {
+      alert("Schwachstellen-Analyse fehlgeschlagen: " + err.message);
+    } finally {
+      setAiWeaknessLoading(false);
     }
   };
 
@@ -1807,8 +1983,40 @@ Maximal 5 Tips. Nur relevante Tipps, kein Füllmaterial. Sei direkt und spezifis
               <div key={ei} style={{background:C.surface,borderRadius:18,padding:"16px 16px 12px",border:`1px solid ${C.border}`,marginBottom:10,borderLeft:`4px solid ${mg?.color||C.muted}`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                   <div onClick={()=>{setSub("history");setDetailEx(ex.exerciseId)}} style={{cursor:"pointer"}}><div style={{fontSize:16,fontWeight:800}}>{def?.name||"?"}</div><div style={{fontSize:11,color:mg?.color,fontWeight:600}}>{mg?.name}</div></div>
-                  <button onClick={()=>rmEx(ei)} style={{width:30,height:30,borderRadius:8,background:C.card,border:`1px solid ${C.border}`,color:C.muted,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <button onClick={()=>generateAiSwap(ei)} title="AI Alternative" style={{width:30,height:30,borderRadius:8,background:aiSwap?.exerciseIndex===ei?C.emberBg:C.card,border:`1px solid ${aiSwap?.exerciseIndex===ei?C.accentBorder:C.border}`,color:aiSwap?.exerciseIndex===ei?C.ember:C.muted,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>⟳</button>
+                    <button onClick={()=>rmEx(ei)} style={{width:30,height:30,borderRadius:8,background:C.card,border:`1px solid ${C.border}`,color:C.muted,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
+                  </div>
                 </div>
+                {/* ═══ AI SWAP SUGGESTIONS ═══ */}
+                {aiSwap?.exerciseIndex === ei && (
+                  <div style={{background:C.emberBg,borderRadius:12,padding:"10px 14px",marginBottom:8,border:`1px solid ${C.accentBorder}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:aiSwap.loading?0:8}}>
+                      <div style={{fontSize:9,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.ember}}>
+                        {aiSwap.loading ? "⏳ Suche Alternativen..." : "AI ALTERNATIVEN"}
+                      </div>
+                      {!aiSwap.loading && <button onClick={()=>setAiSwap(null)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:12,padding:2}}>✕</button>}
+                    </div>
+                    {aiSwap.suggestions && aiSwap.suggestions.map((alt, ai) => {
+                      const altDef = ALL_EX.find(e => e.id === alt.id);
+                      const altMg = altDef ? MG.find(m => m.id === altDef.m) : null;
+                      return (
+                        <div key={ai} onClick={()=>applySwap(ei, alt.id)} style={{background:C.card,borderRadius:10,padding:"10px 12px",marginBottom:4,cursor:"pointer",border:`1px solid ${C.border}`,transition:"all 0.15s"}}
+                          onMouseEnter={e=>e.currentTarget.style.borderColor=C.ember}
+                          onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <div>
+                              <div style={{fontSize:13,fontWeight:700,color:C.text}}>{altDef?.name || alt.id}</div>
+                              <div style={{fontSize:10,color:altMg?.color||C.muted,fontWeight:600}}>{altMg?.name||""}</div>
+                            </div>
+                            <span style={{fontSize:11,color:C.ember,fontWeight:700}}>Wählen</span>
+                          </div>
+                          <div style={{fontSize:11,color:C.sub,marginTop:4,lineHeight:1.4}}>{alt.reason}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {sug && <div style={{background:C.goldBg,borderRadius:10,padding:"8px 12px",marginBottom:8,border:`1px solid ${C.gold}20`,fontSize:12,color:C.gold,fontWeight:600}}>{sug.reason}</div>}
                 {prev && <div style={{fontSize:11,color:C.dim,marginBottom:6}}>Letztes Mal ({new Date(prev.date).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})}): {prev.sets.map(s=>`${s.weight}x${s.reps}${s.type&&s.type!=="N"?` (${s.type})`:""}${s.rpe?` @${s.rpe}`:""}`).join(" / ")}</div>}
 
@@ -2167,6 +2375,72 @@ Maximal 5 Tips. Nur relevante Tipps, kein Füllmaterial. Sei direkt und spezifis
                 <Bar dataKey="vol" name="Volumen (kg)" radius={[0,5,5,0]}>{MG.filter(m=>weekVol[m.id]>0).map((m,i)=><Cell key={i} fill={m.color}/>)}</Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* ═══ AI WEAKNESS ANALYSIS ═══ */}
+          <div style={{marginTop:16}}>
+            <button onClick={generateWeaknessAnalysis} disabled={aiWeaknessLoading}
+              style={{width:"100%",padding:"14px 0",background:aiWeaknessLoading?"transparent":`linear-gradient(135deg, ${C.ember}18, ${C.violet}18)`,border:`1px solid ${C.accentBorder}`,borderRadius:14,cursor:aiWeaknessLoading?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+              <span style={{fontSize:16}}>{aiWeaknessLoading ? "⏳" : "🧠"}</span>
+              <div>
+                <div style={{fontSize:10,fontWeight:700,letterSpacing:2.5,textTransform:"uppercase",color:C.ember}}>{aiWeaknessLoading ? "Analysiere..." : "AI Schwachstellen-Analyse"}</div>
+                <div style={{fontSize:10,color:C.muted,marginTop:2}}>Letzte 4 Wochen · Volumen · Balance</div>
+              </div>
+            </button>
+
+            {aiWeakness && (
+              <div style={{marginTop:12}}>
+                {/* Headline */}
+                <div style={{background:C.emberBg,borderRadius:14,padding:"14px 16px",border:`1px solid ${C.accentBorder}`,marginBottom:12}}>
+                  <div style={{fontSize:9,fontWeight:700,letterSpacing:2.5,textTransform:"uppercase",color:C.ember,marginBottom:4}}>ERGEBNIS</div>
+                  <div style={{fontSize:16,fontWeight:800,color:C.text}}>{aiWeakness.headline}</div>
+                </div>
+
+                {/* Weaknesses */}
+                {(aiWeakness.weaknesses || []).map((w, i) => {
+                  const sevColors = {high: "#c9524a", medium: C.gold, low: C.sky};
+                  const sevLabels = {high: "HOCH", medium: "MITTEL", low: "GERING"};
+                  const col = sevColors[w.severity] || C.muted;
+                  return (
+                    <div key={i} style={{background:C.surface,borderRadius:14,padding:"12px 16px",marginBottom:8,border:`1px solid ${C.border}`,borderLeft:`4px solid ${col}`}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                        <span style={{fontSize:14,fontWeight:800,color:C.text}}>{w.muscle}</span>
+                        <span style={{fontSize:9,fontWeight:700,letterSpacing:1.5,color:col,background:`${col}15`,padding:"3px 8px",borderRadius:6}}>{sevLabels[w.severity] || w.severity}</span>
+                      </div>
+                      <div style={{fontSize:12,color:C.sub,lineHeight:1.5,marginBottom:6}}>{w.issue}</div>
+                      <div style={{fontSize:12,color:C.lime,lineHeight:1.5,background:C.limeBg,borderRadius:8,padding:"8px 10px",border:`1px solid ${C.lime}20`}}>
+                        <span style={{fontSize:9,fontWeight:700,letterSpacing:1.5,display:"block",marginBottom:3}}>EMPFEHLUNG</span>
+                        {w.fix}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Imbalances */}
+                {(aiWeakness.imbalances || []).length > 0 && (
+                  <div style={{marginTop:8}}>
+                    <div style={{fontSize:10,fontWeight:700,letterSpacing:2.5,textTransform:"uppercase",color:C.violet,marginBottom:8,paddingLeft:4}}>DYSBALANCEN</div>
+                    {aiWeakness.imbalances.map((imb, i) => (
+                      <div key={i} style={{background:C.surface,borderRadius:14,padding:"12px 16px",marginBottom:8,border:`1px solid ${C.border}`,borderLeft:`4px solid ${C.violet}`}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                          <span style={{fontSize:13,fontWeight:700,color:C.text}}>{imb.pair}</span>
+                          <span style={{fontSize:12,fontWeight:800,color:C.violet,fontVariantNumeric:"tabular-nums"}}>{imb.ratio}</span>
+                        </div>
+                        <div style={{fontSize:12,color:C.sub,lineHeight:1.5}}>{imb.recommendation}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Overall */}
+                {aiWeakness.overall && (
+                  <div style={{background:"rgba(196,149,106,0.06)",borderRadius:14,padding:"14px 16px",marginTop:8,border:`1px solid ${C.accentBorder}`}}>
+                    <div style={{fontSize:9,fontWeight:700,letterSpacing:2,color:C.ember,marginBottom:4}}>FAZIT</div>
+                    <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{aiWeakness.overall}</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
