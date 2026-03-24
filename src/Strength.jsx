@@ -167,9 +167,9 @@ const SPLIT_PRESETS = {
 // Set types: W=warmup, N=normal, D=drop, F=failure
 const SET_TYPES = [{id:"N",label:"Normal",color:"#F2EDE7"},{id:"W",label:"Warmup",color:"#D4A024"},{id:"D",label:"Drop",color:"#9C7BF2"},{id:"F",label:"Failure",color:"#E8553A"}];
 
-function suggestWeight(exerciseId, prevSets, goalReps=[8,12], allLog=[], recoveryPct=100) {
+function suggestWeight(exerciseId, prevSets, goalReps=[8,12], allLog=[], recoveryPct=100, exList=EX) {
   if (!prevSets?.length) return null;
-  const ex = EX.find(e => e.id === exerciseId);
+  const ex = exList.find(e => e.id === exerciseId) || EX.find(e => e.id === exerciseId);
   if (!ex || ex.bw || ex.timed) return null;
   const workSets = prevSets.filter(s => s.type !== "W" && s.type !== "D");
   if (!workSets.length) return null;
@@ -240,8 +240,8 @@ const WARMUP_EXERCISE_IDS = new Set([
   "row_machine","rack_pull","shrugs_bb","shrugs_smith",
 ]);
 
-function isWarmupRelevant(exerciseId) {
-  const ex = EX.find(e => e.id === exerciseId);
+function isWarmupRelevant(exerciseId, exList=EX) {
+  const ex = exList.find(e => e.id === exerciseId) || EX.find(e => e.id === exerciseId);
   if (!ex || ex.bw || ex.timed) return false;
   if (WARMUP_EXERCISE_IDS.has(exerciseId)) return true;
   // Also relevant if the exercise uses a barbell or smith or is a compound (has secondary muscles)
@@ -254,8 +254,8 @@ function roundToIncrement(weight, increment) {
   return Math.round(weight / increment) * increment;
 }
 
-function generateWarmupSets(exerciseId, targetWeight) {
-  const ex = EX.find(e => e.id === exerciseId);
+function generateWarmupSets(exerciseId, targetWeight, exList=EX) {
+  const ex = exList.find(e => e.id === exerciseId) || EX.find(e => e.id === exerciseId);
   if (!ex || targetWeight <= 0) return [];
 
   const inc = ex.inc || 2.5;
@@ -308,10 +308,10 @@ function getExerciseHistory(exerciseId, log) {
   }).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function getExerciseStats(exerciseId, log) {
+function getExerciseStats(exerciseId, log, allEx) {
   const hist = getExerciseHistory(exerciseId, log);
   if (!hist.length) return null;
-  const def = EX.find(e => e.id === exerciseId);
+  const def = (allEx || EX).find(e => e.id === exerciseId) || EX.find(e => e.id === exerciseId);
   const mg = MG.find(m => m.id === def?.m);
 
   const totalSessions = hist.length;
@@ -380,9 +380,10 @@ function getMilestones(hist, def) {
 }
 
 // ═══ EXERCISE DETAIL COMPONENT ═══
-function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNote }) {
+function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNote, allEx }) {
+  const findEx = (id) => (allEx || EX).find(e => e.id === id) || EX.find(e => e.id === id);
   const [chartType, setChartType] = useState("1rm");
-  const stats = useMemo(() => getExerciseStats(exerciseId, sLog), [exerciseId, sLog]);
+  const stats = useMemo(() => getExerciseStats(exerciseId, sLog, allEx), [exerciseId, sLog, allEx]);
 
   if (!stats) return (
     <div style={{padding:40,textAlign:"center",color:C.dim}}>
@@ -561,10 +562,10 @@ function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNot
 }
 
 // ═══ RECOVERY MODEL ═══
-function muscleRec(muscle, log) {
+function muscleRec(muscle, log, exList=EX) {
   const now = Date.now(); let lastTime = 0; let lastVolume = 0;
   for (const w of log) for (const ex of (w.exercises||[])) {
-    const d = EX.find(e => e.id === ex.exerciseId);
+    const d = exList.find(e => e.id === ex.exerciseId) || EX.find(e => e.id === ex.exerciseId);
     if (d && (d.m === muscle || d.s?.includes(muscle))) {
       const t = new Date(w.date).getTime();
       if (t > lastTime) {
@@ -710,7 +711,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
 
   const mkSets = (eid) => {
     const prev = getPrev(eid);
-    const sug = prev ? suggestWeight(eid, prev.sets, [8,12], sLog, recMap[EX.find(e=>e.id===eid)?.m]||100) : null;
+    const sug = prev ? suggestWeight(eid, prev.sets, [8,12], sLog, recMap[ALL_EX.find(e=>e.id===eid)?.m]||100, ALL_EX) : null;
     const dw = sug?.weight || (prev?.sets?.[0]?.weight || 0);
     return prev ? prev.sets.map(s => ({ weight: dw, reps: s.reps, done: false, type: s.type || "N", rpe: 0 })) :
       [{weight:0,reps:10,done:false,type:"N",rpe:0},{weight:0,reps:10,done:false,type:"N",rpe:0},{weight:0,reps:10,done:false,type:"N",rpe:0}];
@@ -749,7 +750,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
       const recoveryInfo = MG.map(m => `${m.name}: ${recMap[m.id] ?? 100}%`).join(", ");
 
       const recentWorkouts = sLog.slice(0, 5).map(w => {
-        const muscles = [...new Set((w.exercises || []).map(e => EX.find(x => x.id === e.exerciseId)?.m).filter(Boolean))];
+        const muscles = [...new Set((w.exercises || []).map(e => ALL_EX.find(x => x.id === e.exerciseId)?.m).filter(Boolean))];
         const mgNames = muscles.map(mid => MG.find(m => m.id === mid)?.name || mid);
         return `${w.date}: ${mgNames.join(", ")} (${w.exercises?.length || 0} Übungen, ${w.duration || "?"}min)`;
       }).join("\n");
@@ -760,7 +761,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
       }).join("\n");
 
       const splitInfo = trainingDays.length > 0
-        ? trainingDays.map(d => `${d.name}: ${d.exercises.map(eid => EX.find(e => e.id === eid)?.name || eid).join(", ")}`).join("\n")
+        ? trainingDays.map(d => `${d.name}: ${d.exercises.map(eid => ALL_EX.find(e => e.id === eid)?.name || eid).join(", ")}`).join("\n")
         : "Kein fester Split definiert.";
 
       const prompt = `Du bist ein Krafttraining-Coach. Generiere ein optimales Workout für heute.
@@ -1329,7 +1330,7 @@ REGELN FÜR DEINE ANTWORTEN:
     // Calculate summary stats
     let totalVol = 0, totalSets = 0, totalReps = 0, prs = [], muscles = new Set();
     cleaned.exercises.forEach(ex => {
-      const def = EX.find(e => e.id === ex.exerciseId);
+      const def = ALL_EX.find(e => e.id === ex.exerciseId);
       if (def) { muscles.add(def.m); def.s?.forEach(m => muscles.add(m)); }
       const workSets = ex.sets.filter(s => s.type !== "W");
       workSets.forEach(s => { totalVol += s.weight * s.reps; totalSets++; totalReps += s.reps; });
@@ -1362,7 +1363,7 @@ REGELN FÜR DEINE ANTWORTEN:
     const cut = new Date(); cut.setDate(cut.getDate()-7); const cd = cut.toISOString().slice(0,10);
     const vol = {}; MG.forEach(m => { vol[m.id] = 0; });
     sLog.filter(w => w.date >= cd).forEach(w => (w.exercises||[]).forEach(ex => {
-      const d = EX.find(e => e.id === ex.exerciseId); if (!d) return;
+      const d = ALL_EX.find(e => e.id === ex.exerciseId); if (!d) return;
       const v = ex.sets.filter(s => s.type !== "W").reduce((s, set) => s + (set.weight * set.reps), 0);
       vol[d.m] = (vol[d.m]||0) + v;
       d.s?.forEach(m => { vol[m] = (vol[m]||0) + v * 0.4; });
@@ -1370,7 +1371,7 @@ REGELN FÜR DEINE ANTWORTEN:
     return vol;
   }, [sLog]);
 
-  const recMap = useMemo(() => { const r = {}; MG.forEach(m => { r[m.id] = muscleRec(m.id, sLog); }); return r; }, [sLog]);
+  const recMap = useMemo(() => { const r = {}; MG.forEach(m => { r[m.id] = muscleRec(m.id, sLog, ALL_EX); }); return r; }, [sLog, ALL_EX]);
 
   // ═══ DELOAD / PERIODIZATION DETECTION ═══
   const deloadAdvice = useMemo(() => {
@@ -1918,7 +1919,7 @@ REGELN FÜR DEINE ANTWORTEN:
               <div style={{marginBottom:14}}>
                 <div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:1.5,marginBottom:8}}>ZULETZT VERWENDET</div>
                 {recentExIds.slice(0,6).map(eid => {
-                  const ex = EX.find(e=>e.id===eid); if(!ex) return null;
+                  const ex = ALL_EX.find(e=>e.id===eid); if(!ex) return null;
                   const mg = MG.find(m=>m.id===ex.m); const prev = getPrev(eid);
                   return (
                     <div key={eid} onClick={()=>{if(window._addToDay){addExToDay(window._addToDay,eid);setPicker(false);delete window._addToDay;}else addEx(eid)}} style={{padding:"10px 16px",borderRadius:12,background:C.card,border:`1px solid ${C.borderLight}`,marginBottom:4,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -2075,7 +2076,7 @@ REGELN FÜR DEINE ANTWORTEN:
               {aiWorkout.reason && <div style={{fontSize:11,color:C.muted,marginBottom:14,lineHeight:1.5,padding:"8px 12px",background:C.card,borderRadius:10,border:`1px solid ${C.border}`}}>{aiWorkout.reason}</div>}
               <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:14}}>
                 {aiWorkout.exercises.map((eid, i) => {
-                  const def = EX.find(e => e.id === eid);
+                  const def = ALL_EX.find(e => e.id === eid);
                   const mg = MG.find(m => m.id === def?.m);
                   const prev = getPrev(eid);
                   return (
@@ -2183,10 +2184,10 @@ REGELN FÜR DEINE ANTWORTEN:
 
           {/* Exercises */}
           {active.exercises.map((ex, ei) => {
-            const def = EX.find(e => e.id === ex.exerciseId);
+            const def = ALL_EX.find(e => e.id === ex.exerciseId);
             const mg = MG.find(m => m.id === def?.m);
             const prev = getPrev(ex.exerciseId);
-            const sug = prev ? suggestWeight(ex.exerciseId, prev.sets, [8,12], sLog, recMap[EX.find(e=>e.id===ex.exerciseId)?.m]||100) : null;
+            const sug = prev ? suggestWeight(ex.exerciseId, prev.sets, [8,12], sLog, recMap[ALL_EX.find(e=>e.id===ex.exerciseId)?.m]||100, ALL_EX) : null;
             return (
               <div key={ei} style={{background:C.surface,borderRadius:16,padding:"16px 16px 12px",border:`1px solid ${C.border}`,marginBottom:10,borderLeft:`4px solid ${mg?.color||C.muted}`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -2361,7 +2362,7 @@ REGELN FÜR DEINE ANTWORTEN:
                       <button onClick={()=>removeDay(day.id)} style={{width:30,height:30,borderRadius:8,background:C.card,border:`1px solid ${C.border}`,color:C.dim,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
                     </div>
                   </div>
-                  {day.exercises.map((eid,i)=>{const def=EX.find(e=>e.id===eid);const mg=MG.find(m=>m.id===def?.m);
+                  {day.exercises.map((eid,i)=>{const def=ALL_EX.find(e=>e.id===eid);const mg=MG.find(m=>m.id===def?.m);
                     return(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:i<day.exercises.length-1?`1px solid ${C.border}`:"none"}}>
                       <div><span style={{fontSize:13,fontWeight:600}}>{def?.name||eid}</span><span style={{fontSize:11,color:mg?.color,marginLeft:8}}>{mg?.name}</span></div>
                       <button onClick={()=>removeExFromDay(day.id,i)} style={{width:24,height:24,borderRadius:6,background:C.card,border:`1px solid ${C.border}`,color:C.dim,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
@@ -2380,7 +2381,7 @@ REGELN FÜR DEINE ANTWORTEN:
         <div>
           {/* Exercise Detail View */}
           {detailEx ? (
-            <ExerciseDetail exerciseId={detailEx} sLog={sLog} C={C} onClose={()=>setDetailEx(null)} exerciseNotes={exerciseNotes} onEditNote={openNoteEditor} />
+            <ExerciseDetail exerciseId={detailEx} sLog={sLog} C={C} onClose={()=>setDetailEx(null)} exerciseNotes={exerciseNotes} onEditNote={openNoteEditor} allEx={ALL_EX} />
           ) : sLog.length===0 ? (
             <div style={{textAlign:"center",padding:"60px 20px",color:C.dim,fontSize:14}}>Noch keine Kraft-Workouts</div>
           ) : (
@@ -2408,7 +2409,7 @@ REGELN FÜR DEINE ANTWORTEN:
                     dayMap[d].sessions++;
                     (w.exercises || []).forEach(ex => {
                       dayMap[d].exercises++;
-                      const def = EX.find(e => e.id === ex.exerciseId);
+                      const def = ALL_EX.find(e => e.id === ex.exerciseId);
                       if (def) { dayMap[d].muscles.add(def.m); }
                       dayMap[d].vol += ex.sets.filter(s => s.type !== "W").reduce((a, s) => a + (+s.weight||0) * (+s.reps||0), 0);
                     });
@@ -2501,7 +2502,7 @@ REGELN FÜR DEINE ANTWORTEN:
                 <div style={sty.lbl}>ÜBUNGSFORTSCHRITT</div>
                 <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
                   {[...new Set(sLog.flatMap(w=>(w.exercises||[]).map(e=>e.exerciseId)))].map(id => {
-                    const def = EX.find(e=>e.id===id);
+                    const def = ALL_EX.find(e=>e.id===id);
                     const mg = MG.find(m=>m.id===def?.m);
                     const sessions = sLog.filter(w=>(w.exercises||[]).some(e=>e.exerciseId===id)).length;
                     const allSets = sLog.flatMap(w=>(w.exercises||[]).filter(e=>e.exerciseId===id).flatMap(e=>e.sets.filter(s=>s.type!=="W")));
@@ -2532,7 +2533,7 @@ REGELN FÜR DEINE ANTWORTEN:
                     <div style={{fontSize:12,color:C.muted}}>{w.duration||"?"} min &middot; {(w.exercises||[]).length} Üb.</div>
                   </div>
                   {(w.exercises||[]).map((ex,ei)=>{
-                    const def=EX.find(e=>e.id===ex.exerciseId);
+                    const def=ALL_EX.find(e=>e.id===ex.exerciseId);
                     const vol=ex.sets.filter(s=>s.type!=="W").reduce((s,set)=>s+set.weight*set.reps,0);
                     return (
                       <div key={ei} onClick={()=>setDetailEx(ex.exerciseId)} style={{fontSize:12,color:C.sub,marginBottom:2,cursor:"pointer",padding:"2px 0"}}>
