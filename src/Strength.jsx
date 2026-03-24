@@ -2497,6 +2497,91 @@ REGELN FÜR DEINE ANTWORTEN:
                 })()}
               </div>
 
+              {/* ═══ PERSONAL RECORDS BOARD ═══ */}
+              {(() => {
+                // Build PR data: best 1RM per exercise with date and weight/reps
+                const prBoard = [];
+                const seen = {};
+                sLog.forEach(w => (w.exercises || []).forEach(ex => {
+                  const workSets = (ex.sets || []).filter(s => s.type !== "W");
+                  workSets.forEach(s => {
+                    const e1rm = est1RM(s.weight, s.reps);
+                    if (e1rm > 0 && (!seen[ex.exerciseId] || e1rm > seen[ex.exerciseId].e1rm)) {
+                      seen[ex.exerciseId] = { e1rm, weight: s.weight, reps: s.reps, date: w.date };
+                    }
+                  });
+                }));
+                Object.entries(seen).forEach(([id, pr]) => {
+                  const def = ALL_EX.find(e => e.id === id);
+                  const mg = MG.find(m => m.id === def?.m);
+                  prBoard.push({ id, name: def?.name || id, mg: mg?.name || "?", mgColor: mg?.color || C.dim, ...pr });
+                });
+                prBoard.sort((a, b) => b.e1rm - a.e1rm);
+
+                if (!prBoard.length) return null;
+
+                // Group by muscle
+                const muscleGroups = {};
+                prBoard.forEach(pr => {
+                  if (!muscleGroups[pr.mg]) muscleGroups[pr.mg] = { color: pr.mgColor, prs: [] };
+                  muscleGroups[pr.mg].prs.push(pr);
+                });
+
+                return (
+                  <div style={sty.card}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                      <div style={sty.lbl}>PERSONAL RECORDS</div>
+                      <div style={{fontSize:10,color:C.ember,fontWeight:700}}>{prBoard.length} PRs</div>
+                    </div>
+
+                    {/* Top 3 highlight */}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:16}}>
+                      {prBoard.slice(0, 3).map((pr, i) => {
+                        const medals = ["🥇", "🥈", "🥉"];
+                        return (
+                          <div key={pr.id} onClick={()=>setDetailEx(pr.id)} style={{
+                            background: i === 0 ? `linear-gradient(145deg, ${C.ember}12, ${C.gold}08)` : C.card,
+                            borderRadius:14,padding:"12px 10px",textAlign:"center",cursor:"pointer",
+                            border:`1px solid ${i === 0 ? C.accentBorder : C.border}`,
+                            position:"relative",overflow:"hidden",
+                          }}>
+                            <div style={{fontSize:20,marginBottom:4}}>{medals[i]}</div>
+                            <div style={{fontSize:18,fontWeight:800,color:i===0?C.ember:C.text,fontFamily:"'Cormorant Garamond',serif"}}>{Math.round(pr.e1rm)}<span style={{fontSize:11,fontWeight:400}}>kg</span></div>
+                            <div style={{fontSize:10,fontWeight:700,color:C.sub,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pr.name}</div>
+                            <div style={{fontSize:9,color:C.dim,marginTop:2}}>{pr.weight}×{pr.reps}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Full list grouped by muscle */}
+                    {Object.entries(muscleGroups).map(([mgName, group]) => (
+                      <div key={mgName} style={{marginBottom:12}}>
+                        <div style={{fontSize:9,fontWeight:700,color:group.color,letterSpacing:2,textTransform:"uppercase",marginBottom:6,paddingLeft:2}}>{mgName}</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {group.prs.map(pr => (
+                            <div key={pr.id} onClick={()=>setDetailEx(pr.id)} style={{
+                              display:"flex",alignItems:"center",gap:10,padding:"8px 12px",
+                              borderRadius:12,background:C.card,border:`1px solid ${C.border}`,cursor:"pointer",
+                            }}>
+                              <div style={{width:4,height:28,borderRadius:2,background:group.color,flexShrink:0}} />
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pr.name}</div>
+                                <div style={{fontSize:10,color:C.dim}}>{new Date(pr.date).toLocaleDateString("de-DE",{day:"2-digit",month:"short",year:"2-digit"})}</div>
+                              </div>
+                              <div style={{textAlign:"right",flexShrink:0}}>
+                                <div style={{fontSize:15,fontWeight:800,color:group.color,fontVariantNumeric:"tabular-nums"}}>{Math.round(pr.e1rm)}<span style={{fontSize:10,fontWeight:400,color:C.dim}}> 1RM</span></div>
+                                <div style={{fontSize:10,color:C.muted}}>{pr.weight}kg × {pr.reps}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               {/* Exercise selector with tap-to-detail */}
               <div style={sty.card}>
                 <div style={sty.lbl}>ÜBUNGSFORTSCHRITT</div>
