@@ -615,6 +615,8 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const [chatMessages, setChatMessages] = useState([]); // [{role:"user"|"assistant", content:"..."}]
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [gymMode, setGymMode] = useState(false); // compact gym logging UI
+  const [gymExIdx, setGymExIdx] = useState(0); // current exercise index in gym mode
   const chatEndRef = useRef(null);
   const chatInputRef = useRef(null);
   const timerRef = useRef(null);
@@ -2166,7 +2168,140 @@ REGELN FÜR DEINE ANTWORTEN:
       )}
 
       {sub==="log" && active && (
+        gymMode ? (
+          /* ═══ GYM MODE — Compact Fullscreen Logging UI ═══ */
+          <div style={{position:"fixed",inset:0,zIndex:300,background:C.bg,color:C.text,fontFamily:"'Manrope',sans-serif",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            {/* Gym mode header */}
+            <div style={{padding:"14px 20px 10px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,15,0.95)",flexShrink:0}}>
+              <button onClick={()=>setGymMode(false)} style={{background:"none",border:"none",color:C.ember,fontSize:12,fontWeight:700,cursor:"pointer",letterSpacing:2,textTransform:"uppercase",fontFamily:"inherit",padding:0}}>← NORMAL</button>
+              <div style={{fontSize:10,color:C.muted,fontWeight:600,letterSpacing:2}}>{active.exercises.length} ÜBUNGEN</div>
+              <div style={{fontSize:12,color:C.sub,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{Math.round((Date.now() - active.start) / 60000)}m</div>
+            </div>
+
+            {/* Rest timer (if active) */}
+            {restStart && (
+              <div onClick={()=>setRestStart(null)} style={{padding:"14px 24px",background:restSec>=restTarget?C.limeBg:C.emberBg,borderBottom:`1px solid ${restSec>=restTarget?C.lime:C.ember}25`,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",flexShrink:0}}>
+                <span style={{fontSize:12,color:C.sub,fontWeight:600}}>Pause</span>
+                <span style={{fontSize:32,fontWeight:900,color:restSec>=restTarget?C.lime:C.ember,fontVariantNumeric:"tabular-nums"}}>{fmtT(restSec)}</span>
+                <span style={{fontSize:12,color:C.muted}}>{restSec>=restTarget?"Fertig!":"Stoppen"}</span>
+              </div>
+            )}
+
+            {/* Exercise navigation tabs */}
+            <div style={{display:"flex",overflowX:"auto",gap:0,borderBottom:`1px solid ${C.border}`,flexShrink:0,WebkitOverflowScrolling:"touch"}}>
+              {active.exercises.map((ex, i) => {
+                const d = ALL_EX.find(e => e.id === ex.exerciseId);
+                const mg = MG.find(m => m.id === d?.m);
+                const doneSets = ex.sets.filter(s => s.done).length;
+                return (
+                  <button key={i} onClick={()=>setGymExIdx(i)} style={{
+                    padding:"10px 16px",background:"transparent",border:"none",flexShrink:0,
+                    borderBottom:gymExIdx===i?`2px solid ${mg?.color||C.ember}`:"2px solid transparent",
+                    color:gymExIdx===i?C.text:C.dim,fontSize:11,fontWeight:gymExIdx===i?700:500,
+                    cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",
+                  }}>
+                    {d?.name?.split(" ")[0]||"?"} <span style={{color:mg?.color||C.muted,fontSize:9}}>({doneSets}/{ex.sets.length})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Current exercise — main content */}
+            {(() => {
+              const ex = active.exercises[gymExIdx];
+              if (!ex) return <div style={{padding:40,textAlign:"center",color:C.dim}}>Keine Übung</div>;
+              const d = ALL_EX.find(e => e.id === ex.exerciseId);
+              const mg = MG.find(m => m.id === d?.m);
+              const prev = getPrev(ex.exerciseId);
+              return (
+                <div style={{flex:1,overflowY:"auto",padding:"16px 20px",WebkitOverflowScrolling:"touch"}}>
+                  {/* Exercise name */}
+                  <div style={{marginBottom:12}}>
+                    <div style={{fontSize:22,fontWeight:800,color:C.text}}>{d?.name||"?"}</div>
+                    <div style={{fontSize:12,color:mg?.color,fontWeight:600}}>{mg?.name}</div>
+                    {prev && <div style={{fontSize:11,color:C.dim,marginTop:4}}>Letztes Mal: {prev.sets.map(s=>`${s.weight}×${s.reps}`).join(" / ")}</div>}
+                  </div>
+
+                  {/* Sets — large touch targets */}
+                  {ex.sets.map((s, si) => (
+                    <div key={si} style={{
+                      display:"grid",gridTemplateColumns:"36px 52px 1fr 1fr 60px 44px",
+                      gap:6,alignItems:"center",marginBottom:8,
+                      padding:"10px 12px",borderRadius:14,
+                      background:s.done?`${mg?.color||C.ember}10`:C.surface,
+                      border:`1px solid ${s.done?(mg?.color||C.ember)+"30":C.border}`,
+                    }}>
+                      {/* Set number + type */}
+                      <div onClick={()=>upSet(gymExIdx, si, "type", s.type==="N"?"W":s.type==="W"?"D":s.type==="D"?"F":"N")}
+                        style={{fontSize:11,fontWeight:700,color:s.type==="W"?C.sky:s.type==="D"?C.gold:s.type==="F"?"#c9524a":C.muted,cursor:"pointer",textAlign:"center"}}>
+                        {s.type==="W"?"W":s.type==="D"?"D":s.type==="F"?"F":si+1}
+                      </div>
+                      {/* Type label */}
+                      <div style={{fontSize:9,color:C.dim,textAlign:"center"}}>{s.type==="N"?"Normal":s.type==="W"?"Warm":s.type==="D"?"Drop":s.type==="F"?"Fail":""}</div>
+                      {/* Weight */}
+                      <input value={s.weight||""} onChange={e=>upSet(gymExIdx, si, "weight", e.target.value)}
+                        type="text" inputMode="decimal" placeholder="KG"
+                        style={{padding:"12px 8px",background:C.card,border:`1px solid ${C.borderLight}`,borderRadius:10,color:C.text,fontSize:18,fontWeight:800,textAlign:"center",outline:"none",fontFamily:"inherit",width:"100%"}} />
+                      {/* Reps */}
+                      <input value={s.reps||""} onChange={e=>upSet(gymExIdx, si, "reps", e.target.value)}
+                        type="text" inputMode="numeric" placeholder="REPS"
+                        style={{padding:"12px 8px",background:C.card,border:`1px solid ${C.borderLight}`,borderRadius:10,color:C.text,fontSize:18,fontWeight:800,textAlign:"center",outline:"none",fontFamily:"inherit",width:"100%"}} />
+                      {/* RPE */}
+                      <input value={s.rpe||""} onChange={e=>upSet(gymExIdx, si, "rpe", e.target.value)}
+                        type="text" inputMode="numeric" placeholder="RPE"
+                        style={{padding:"12px 6px",background:C.card,border:`1px solid ${C.borderLight}`,borderRadius:10,color:C.ember,fontSize:14,fontWeight:700,textAlign:"center",outline:"none",fontFamily:"inherit",width:"100%"}} />
+                      {/* Done toggle */}
+                      <button onClick={()=>{
+                        upSet(gymExIdx, si, "done", !s.done);
+                        if (!s.done) {
+                          const isCompound = d?.s?.length > 0;
+                          setRestTarget(isCompound ? 180 : 90);
+                          setRestStart(Date.now()); setRestSec(0); setRestAlerted(false);
+                        }
+                      }} style={{
+                        width:44,height:44,borderRadius:12,border:"none",cursor:"pointer",
+                        background:s.done?`linear-gradient(135deg, ${mg?.color||C.ember}, ${mg?.color||C.ember}cc)`:"rgba(255,255,255,0.04)",
+                        color:s.done?"#0a0a0f":C.dim,fontSize:18,fontWeight:700,
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                      }}>
+                        {s.done?"✓":"○"}
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Add set */}
+                  <button onClick={()=>setActive(p=>({...p,exercises:p.exercises.map((e,i)=>i!==gymExIdx?e:{...e,sets:[...e.sets,{weight:e.sets[e.sets.length-1]?.weight||"",reps:"",done:false,type:"N",rpe:""}]})}))}
+                    style={{width:"100%",padding:"14px 0",background:C.surface,border:`1.5px dashed ${C.border}`,borderRadius:14,color:C.muted,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginTop:4,marginBottom:16}}>
+                    + Satz
+                  </button>
+
+                  {/* Nav between exercises */}
+                  <div style={{display:"flex",gap:10,marginBottom:12}}>
+                    <button disabled={gymExIdx<=0} onClick={()=>setGymExIdx(p=>p-1)}
+                      style={{flex:1,padding:"14px 0",background:gymExIdx>0?C.surface:C.bg,border:`1px solid ${C.border}`,borderRadius:14,color:gymExIdx>0?C.sub:C.dim,fontSize:14,fontWeight:700,cursor:gymExIdx>0?"pointer":"default",fontFamily:"inherit"}}>
+                      ← Vorherige
+                    </button>
+                    <button disabled={gymExIdx>=active.exercises.length-1} onClick={()=>setGymExIdx(p=>p+1)}
+                      style={{flex:1,padding:"14px 0",background:gymExIdx<active.exercises.length-1?C.surface:C.bg,border:`1px solid ${C.border}`,borderRadius:14,color:gymExIdx<active.exercises.length-1?C.sub:C.dim,fontSize:14,fontWeight:700,cursor:gymExIdx<active.exercises.length-1?"pointer":"default",fontFamily:"inherit"}}>
+                      Nächste →
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Bottom action bar */}
+            <div style={{padding:"12px 20px",borderTop:`1px solid ${C.border}`,background:"rgba(10,10,15,0.95)",flexShrink:0,display:"flex",gap:10}}>
+              <button onClick={()=>{setPicker(true);setGymMode(false)}} style={{flex:1,padding:"14px 0",background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,color:C.sub,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:1.5,textTransform:"uppercase"}}>+ Übung</button>
+              <button onClick={()=>{setGymMode(false);finish()}} style={{flex:1,padding:"14px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase"}}>Beenden</button>
+            </div>
+          </div>
+        ) : (
         <div>
+          {/* Gym Mode toggle */}
+          <button onClick={()=>{setGymMode(true);setGymExIdx(0)}} style={{width:"100%",padding:"10px 0",background:`linear-gradient(135deg, ${C.violet}10, ${C.sky}08)`,border:`1px solid ${C.violet}25`,borderRadius:14,color:C.violet,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2.5,textTransform:"uppercase",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <span style={{fontSize:16}}>⌚</span> GYM MODE
+          </button>
           {/* REST TIMER with countdown */}
           {restStart && (
             <div onClick={()=>setRestStart(null)} style={{background:restSec>=restTarget?C.limeBg:C.emberBg,borderRadius:14,padding:"12px 18px",border:`1px solid ${restSec>=restTarget?C.lime:C.ember}30`,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",transition:"background 0.3s"}}>
@@ -2319,6 +2454,7 @@ REGELN FÜR DEINE ANTWORTEN:
           </div>
           <button onClick={()=>{if(confirm("Abbrechen?"))setActive(null)}} style={{width:"100%",padding:"12px 0",background:"transparent",color:C.dim,border:"none",fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Abbrechen</button>
         </div>
+        )
       )}
 
       {/* ═══ TRAINING DAYS ═══ */}
