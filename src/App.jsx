@@ -4,12 +4,14 @@ import {
   CartesianGrid, Cell, AreaChart, Area, LineChart, Line
 } from "recharts";
 import {
-  Activity, ArrowRight, Copy, Dumbbell, Pencil, Plus, ShieldCheck,
-  Trash2, X
+  Activity, ArrowRight, BrainCircuit, Copy, Dumbbell, Pencil, Play, Plus,
+  ShieldCheck, Trash2, X
 } from "lucide-react";
 import { formatDate, getISOWeekKey, getMonday, toDateInput } from "./dateUtils";
+import LiveCardio from "./LiveCardio";
 
 const StrengthSection = lazy(() => import("./Strength"));
+const CoachHub = lazy(() => import("./CoachHub"));
 
 const C = {
   bg: "#0a0a0f", surface: "rgba(18,18,26,0.85)", card: "rgba(24,24,35,0.7)", elevated: "rgba(30,30,42,0.9)",
@@ -114,6 +116,7 @@ const LAST_MODE_KEY = "performance-tracker-last-mode";
 const DEFAULT_DATA = {
   workouts: [], startDate: null, strengthLog: [], strengthTemplates: [], trainingDays: [],
   userEquipment: undefined, exerciseNotes: {}, customExercises: [], aiApiKey: "",
+  readinessCheckIns: [], healthMetrics: [], integrationSources: {},
 };
 const getMon = getMonday;
 const getWk = getISOWeekKey;
@@ -133,6 +136,9 @@ const hydrateData = value => {
     trainingDays: Array.isArray(source.trainingDays) ? source.trainingDays : [],
     exerciseNotes: source.exerciseNotes && typeof source.exerciseNotes === "object" ? source.exerciseNotes : {},
     customExercises: Array.isArray(source.customExercises) ? source.customExercises : [],
+    readinessCheckIns: Array.isArray(source.readinessCheckIns) ? source.readinessCheckIns : [],
+    healthMetrics: Array.isArray(source.healthMetrics) ? source.healthMetrics : [],
+    integrationSources: source.integrationSources && typeof source.integrationSources === "object" ? source.integrationSources : {},
   };
 };
 
@@ -158,9 +164,9 @@ export default function App(){
   const [mode, setMode] = useState(() => {
     try {
       const saved = localStorage.getItem(LAST_MODE_KEY);
-      return saved === "cardio" || saved === "strength" ? saved : null;
+      return ["cardio","strength","coach"].includes(saved) ? saved : null;
     } catch { return null; }
-  }); // null=selector, "cardio", "strength"
+  }); // null=selector, "cardio", "strength", "coach"
   const [view, setView] = useState("dash");
   const [modal, setModal] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -177,6 +183,8 @@ export default function App(){
   const [newPR, setNewPR] = useState(null);
   const [formError, setFormError] = useState("");
   const [storageError, setStorageError] = useState("");
+  const [liveSession, setLiveSession] = useState(null);
+  const [strengthStartSub, setStrengthStartSub] = useState("log");
   const pillRef = useRef(null);
 
   const openSheet = (week, session) => { setSRpe(5); setSDist(estDist(session.type, session.duration)); setSheet({ week, session }); };
@@ -301,6 +309,42 @@ export default function App(){
       return {workouts:next};
     });
     setSheet(null);
+  };
+
+  const startLiveSession = (session, week = null) => {
+    const planRef = session.planRef || (week && session.day ? `w${week}-${session.day}-${startDate||'x'}` : null);
+    setLiveSession({
+      ...session,
+      planRef,
+      estimatedDistance: session.estimatedDistance ?? estDist(session.type, session.duration),
+      hrAvg: session.hrAvg ?? parseHrMid(String(session.hr || "0")),
+      note: session.note || (week ? `W${week} ${session.title}` : session.title),
+    });
+    setSheet(null);
+  };
+
+  const finishLiveSession = result => {
+    if (!liveSession) return;
+    const workout = {
+      id: Date.now().toString(),
+      type: liveSession.type || "other",
+      duration: result.duration,
+      distance: result.distance,
+      hrAvg: result.hrAvg,
+      date: toDateInput(),
+      note: liveSession.note || `Live · ${liveSession.title}`,
+      rpe: result.rpe,
+      planRef: liveSession.planRef || null,
+      laps: result.laps || [],
+      source: "live-cockpit",
+    };
+    update(prev => {
+      const next = [...prev.workouts, workout].sort((a,b)=>b.date.localeCompare(a.date));
+      const records = checkPRs(workout, next);
+      if (records.length) setNewPR(records);
+      return { workouts:next };
+    });
+    setLiveSession(null);
   };
 
   const openPrefilled = (session,week)=>{
@@ -435,9 +479,35 @@ export default function App(){
         {storageBanner}
         <div style={{position:"relative",zIndex:1}}>
           <Suspense fallback={<div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:C.bg}}><div aria-label="Kraftbereich wird geladen" style={{width:28,height:28,border:`3px solid ${C.sky}`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite"}}/></div>}>
-            <StrengthSection C={C} data={data} update={update} onBack={backToModes} />
+            <StrengthSection C={C} data={data} update={update} onBack={backToModes} initialSub={strengthStartSub} />
           </Suspense>
         </div>
+      </div>
+    );
+  }
+
+  // ═══ COACH 2.0 — Adaptive hybrid training hub ═══
+  if (mode === "coach") {
+    const planned = todaySessions[0]
+      ? { ...todaySessions[0], planRef:`w${currentPlanWeek}-${todaySessions[0].day}-${startDate||'x'}` }
+      : null;
+    return (
+      <div style={{fontFamily:bodyFont}}>
+        <link href={fontLink} rel="stylesheet"/>
+        <style>{globalStyles}</style>
+        {storageBanner}
+        <Suspense fallback={<div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:C.bg}}><div aria-label="Coach wird geladen" style={{width:28,height:28,border:`3px solid ${C.violet}`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite"}}/></div>}>
+          <CoachHub
+            C={C}
+            data={data}
+            update={update}
+            plannedSession={planned}
+            onBack={backToModes}
+            onStartLive={startLiveSession}
+            onOpenStrength={sub=>{setStrengthStartSub(sub||"log");selectMode("strength")}}
+          />
+        </Suspense>
+        {liveSession && <LiveCardio C={C} session={liveSession} onFinish={finishLiveSession} onCancel={()=>setLiveSession(null)}/>}
       </div>
     );
   }
@@ -457,8 +527,9 @@ export default function App(){
 
           <div className="mode-card-grid">
             {[
-              {mode:"cardio",Icon:Activity,accent:C.ember,label:"CARDIO",title:"Ausdauer",desc:"10-Wochen-Plan, Zone 2 und Intervalle",meta:`${data.workouts.length} Cardio-Sessions`,delay:"0.15s"},
-              {mode:"strength",Icon:Dumbbell,accent:C.sky,label:"KRAFT",title:"Krafttraining",desc:"Progressive Overload, Splits und Recovery",meta:`${data.strengthLog.length} Kraft-Sessions`,delay:"0.25s"},
+              {mode:"coach",Icon:BrainCircuit,accent:C.violet,label:"COACH 2.0",title:"Heute",desc:"Readiness, adaptive Planung und Live-Cockpit",meta:data.readinessCheckIns.length?`${data.readinessCheckIns.length} Readiness-Checks`:"Dein smarter Trainingsstart",delay:"0.12s"},
+              {mode:"cardio",Icon:Activity,accent:C.ember,label:"CARDIO",title:"Ausdauer",desc:"10-Wochen-Plan, Zone 2 und Intervalle",meta:`${data.workouts.length} Cardio-Sessions`,delay:"0.2s"},
+              {mode:"strength",Icon:Dumbbell,accent:C.sky,label:"KRAFT",title:"Krafttraining",desc:"Progressive Overload, Ghost und Recovery",meta:`${data.strengthLog.length} Kraft-Sessions`,delay:"0.28s"},
             ].map(item => (
               <div key={item.mode} className="card3d" style={{animation:`fadeUp 0.4s ease ${item.delay} both`}}>
                 <button type="button" className="card3d-inner training-mode-card" onClick={()=>selectMode(item.mode)} style={{
@@ -497,6 +568,7 @@ export default function App(){
       <link href={fontLink} rel="stylesheet"/>
       <style>{globalStyles}</style>
       {storageBanner}
+      {liveSession && <LiveCardio C={C} session={liveSession} onFinish={finishLiveSession} onCancel={()=>setLiveSession(null)}/>}
 
       {/* HEADER — no backdrop-filter for iOS Safari stability */}
       <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"#0b0b12"}}>
@@ -580,7 +652,8 @@ export default function App(){
                       <div style={{padding:"10px 0"}}><input type="range" min={1} max={10} value={sRpe} onChange={e=>setSRpe(+e.target.value)} style={{width:"100%"}}/></div>
                     </div>
                   </div>
-                  <button onClick={()=>quickComplete(s,sheet.week,sRpe,sDist)} style={{width:"100%",padding:"15px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${C.ember}44`,marginBottom:8}}>Abgeschlossen</button>
+                  <button onClick={()=>startLiveSession(s,sheet.week)} style={{width:"100%",padding:"15px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${C.ember}44`,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><Play size={17} fill="currentColor"/> Live-Cockpit starten</button>
+                  <button onClick={()=>quickComplete(s,sheet.week,sRpe,sDist)} style={{width:"100%",padding:"14px 0",background:C.card,color:C.lime,border:`1px solid ${C.lime}30`,borderRadius:14,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}>Direkt als abgeschlossen speichern</button>
                   <button onClick={()=>openPrefilled(s,sheet.week)} style={{width:"100%",padding:"13px 0",background:C.card,color:C.sub,border:`1px solid ${C.border}`,borderRadius:14,fontSize:14,fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}>Alle Details bearbeiten</button>
                 </>
               )}
