@@ -1,9 +1,15 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, AreaChart, Area, LineChart, Line
 } from "recharts";
-import StrengthSection from "./Strength";
+import {
+  Activity, ArrowRight, Copy, Dumbbell, Pencil, Plus, ShieldCheck,
+  Trash2, X
+} from "lucide-react";
+import { formatDate, getISOWeekKey, getMonday, toDateInput } from "./dateUtils";
+
+const StrengthSection = lazy(() => import("./Strength"));
 
 const C = {
   bg: "#0a0a0f", surface: "rgba(18,18,26,0.85)", card: "rgba(24,24,35,0.7)", elevated: "rgba(30,30,42,0.9)",
@@ -104,12 +110,31 @@ const BADGE_DEFS = [
 ];
 
 const KEY = "cardio-v4";
-const getMon = d => { const t=new Date(d),dy=t.getDay(); t.setDate(t.getDate()-dy+(dy===0?-6:1)); return t; };
-const getWk = d => { const t=new Date(d),j=new Date(t.getFullYear(),0,1),dy=Math.floor((t-j)/864e5); return `${t.getFullYear()}-W${String(Math.ceil((dy+j.getDay()+1)/7)).padStart(2,"0")}`; };
-const fS = d => new Date(d).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
-const fL = d => new Date(d).toLocaleDateString("de-DE",{day:"2-digit",month:"short"});
+const LAST_MODE_KEY = "performance-tracker-last-mode";
+const DEFAULT_DATA = {
+  workouts: [], startDate: null, strengthLog: [], strengthTemplates: [], trainingDays: [],
+  userEquipment: undefined, exerciseNotes: {}, customExercises: [], aiApiKey: "",
+};
+const getMon = getMonday;
+const getWk = getISOWeekKey;
+const fS = d => formatDate(d,{day:"2-digit",month:"2-digit"});
+const fL = d => formatDate(d,{day:"2-digit",month:"short"});
 const parseHrMid = s => { const m=s.match(/(\d+)\s*-\s*(\d+)/); return m ? Math.round((+m[1]+ +m[2])/2) : parseInt(s)||140; };
 const estDist = (type, dur) => { const t=TYPES.find(x=>x.id===type); return t?.estPace>0 ? Math.round(dur/t.estPace*10)/10 : 0; };
+
+const hydrateData = value => {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    ...DEFAULT_DATA,
+    ...source,
+    workouts: Array.isArray(source.workouts) ? source.workouts : [],
+    strengthLog: Array.isArray(source.strengthLog) ? source.strengthLog : [],
+    strengthTemplates: Array.isArray(source.strengthTemplates) ? source.strengthTemplates : [],
+    trainingDays: Array.isArray(source.trainingDays) ? source.trainingDays : [],
+    exerciseNotes: source.exerciseNotes && typeof source.exerciseNotes === "object" ? source.exerciseNotes : {},
+    customExercises: Array.isArray(source.customExercises) ? source.customExercises : [],
+  };
+};
 
 const tt = { contentStyle:{ background:C.elevated, border:`1px solid ${C.borderLight}`, borderRadius:10, fontSize:12, fontFamily:"'Outfit',sans-serif", color:C.text }, labelStyle:{color:C.muted} };
 
@@ -129,8 +154,13 @@ function TI({type,size=36}){
 }
 
 export default function App(){
-  const [data, setData] = useState({ workouts:[], startDate:null, strengthLog:[], strengthTemplates:[], trainingDays:[], userEquipment:undefined, exerciseNotes:{} });
-  const [mode, setMode] = useState(null); // null=selector, "cardio", "strength"
+  const [data, setData] = useState(DEFAULT_DATA);
+  const [mode, setMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem(LAST_MODE_KEY);
+      return saved === "cardio" || saved === "strength" ? saved : null;
+    } catch { return null; }
+  }); // null=selector, "cardio", "strength"
   const [view, setView] = useState("dash");
   const [modal, setModal] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -145,30 +175,54 @@ export default function App(){
   const [sDist, setSDist] = useState(0);
   const [showBadgeDetail, setShowBadgeDetail] = useState(null);
   const [newPR, setNewPR] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [storageError, setStorageError] = useState("");
   const pillRef = useRef(null);
 
   const openSheet = (week, session) => { setSRpe(5); setSDist(estDist(session.type, session.duration)); setSheet({ week, session }); };
 
-  const [f, setF] = useState({type:"zone2",dur:45,dist:5,hr:138,date:new Date().toISOString().slice(0,10),note:"",rpe:5});
-  const up = (k,v)=>setF(p=>({...p,[k]:v}));
+  const [f, setF] = useState({type:"zone2",dur:45,dist:5,hr:138,date:toDateInput(),note:"",rpe:5});
+  const up = (k,v)=>{ setFormError(""); setF(p=>({...p,[k]:v})); };
 
   const workouts = data.workouts;
   const startDate = data.startDate;
 
   useEffect(()=>{
-    try{ const r=localStorage.getItem(KEY); if(r) setData(JSON.parse(r)); }catch{}
+    try{
+      const r=localStorage.getItem(KEY);
+      if(r) setData(hydrateData(JSON.parse(r)));
+    }catch{
+      setStorageError("Gespeicherte Daten konnten nicht gelesen werden. Neue Einträge werden erst nach einem Reload gespeichert.");
+    }
     setLoaded(true);
   },[]);
 
-  const persist = useCallback(d=>{try{localStorage.setItem(KEY,JSON.stringify(d))}catch{}},[]);
+  const persist = useCallback(d=>{
+    try{
+      localStorage.setItem(KEY,JSON.stringify(d));
+      setStorageError("");
+    }catch{
+      setStorageError("Speichern fehlgeschlagen. Prüfe den verfügbaren Gerätespeicher und exportiere deine Daten.");
+    }
+  },[]);
   const update = useCallback((fn)=>{
     setData(prev=>{const next={...prev,...fn(prev)};persist(next);return next;});
   },[persist]);
 
   const setStartDate = (d)=> update(()=>({startDate:d}));
 
+  const selectMode = nextMode => {
+    setMode(nextMode);
+    try { localStorage.setItem(LAST_MODE_KEY, nextMode); } catch {}
+  };
+
+  const backToModes = () => {
+    setMode(null);
+    try { localStorage.removeItem(LAST_MODE_KEY); } catch {}
+  };
+
   const currentPlanWeek = startDate ? (()=>{
-    const start = getMon(new Date(startDate));
+    const start = getMon(startDate);
     const now = getMon(new Date());
     const diff = Math.floor((now-start)/(7*864e5))+1;
     return Math.max(1,Math.min(10,diff));
@@ -184,12 +238,14 @@ export default function App(){
     const prev = allWorkouts.filter(w => w.id !== newWorkout.id);
     const prs = [];
     // Longest duration
-    if (newWorkout.duration > 0 && (!prev.length || newWorkout.duration > Math.max(...prev.map(w=>w.duration))))
+    const runningTypes = ["zone2","intervals","tempo","easy"];
+    const previousRuns = prev.filter(w => runningTypes.includes(w.type));
+    if (runningTypes.includes(newWorkout.type) && newWorkout.duration > 0 && (!previousRuns.length || newWorkout.duration > Math.max(...previousRuns.map(w=>w.duration))))
       prs.push({ type: "Längster Lauf", value: `${newWorkout.duration} min` });
     // Fastest pace (running types only, lower is better)
-    if (newWorkout.distance > 0 && ["zone2","intervals","tempo","easy"].includes(newWorkout.type)) {
+    if (newWorkout.distance > 0 && runningTypes.includes(newWorkout.type)) {
       const pace = newWorkout.duration / newWorkout.distance;
-      const prevPaces = prev.filter(w=>w.distance>0&&["zone2","intervals","tempo","easy"].includes(w.type)).map(w=>w.duration/w.distance);
+      const prevPaces = prev.filter(w=>w.distance>0&&runningTypes.includes(w.type)).map(w=>w.duration/w.distance);
       if (!prevPaces.length || pace < Math.min(...prevPaces))
         prs.push({ type: "Schnellste Pace", value: `${(pace).toFixed(1)} min/km` });
     }
@@ -211,7 +267,22 @@ export default function App(){
   }, []);
 
   const doSave = ()=>{
-    const w={id:editId||Date.now().toString(),type:f.type,duration:+f.dur,distance:+f.dist,hrAvg:+f.hr,date:f.date,note:f.note,rpe:+f.rpe,planRef:f.planRef||null};
+    const duration = Number(f.dur);
+    const distance = Number(f.dist);
+    const heartRate = Number(f.hr);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f.date)) {
+      setFormError("Bitte wähle ein gültiges Datum."); return;
+    }
+    if (!Number.isFinite(duration) || duration <= 0 || duration > 1440) {
+      setFormError("Die Dauer muss zwischen 1 und 1.440 Minuten liegen."); return;
+    }
+    if (!Number.isFinite(distance) || distance < 0 || distance > 1000) {
+      setFormError("Bitte gib eine gültige Distanz ein."); return;
+    }
+    if (!Number.isFinite(heartRate) || heartRate < 0 || heartRate > 240) {
+      setFormError("Die Herzfrequenz muss zwischen 0 und 240 bpm liegen."); return;
+    }
+    const w={id:editId||Date.now().toString(),type:f.type,duration,distance,hrAvg:heartRate,date:f.date,note:f.note.trim(),rpe:+f.rpe,planRef:f.planRef||null};
     update(prev=>{
       let next=editId?prev.workouts.map(x=>x.id===editId?w:x):[...prev.workouts,w];
       next.sort((a,b)=>b.date.localeCompare(a.date));
@@ -222,7 +293,8 @@ export default function App(){
   };
 
   const quickComplete = (session,week,rpe,dist)=>{
-    const w={id:Date.now().toString(),type:session.type,duration:session.duration,distance:dist,hrAvg:parseHrMid(session.hr),date:new Date().toISOString().slice(0,10),note:`W${week} ${session.title}`,rpe,planRef:`w${week}-${session.day}-${startDate||'x'}`};
+    const safeDistance = Number.isFinite(Number(dist)) && Number(dist) >= 0 ? Number(dist) : 0;
+    const w={id:Date.now().toString(),type:session.type,duration:session.duration,distance:safeDistance,hrAvg:parseHrMid(session.hr),date:toDateInput(),note:`W${week} ${session.title}`,rpe,planRef:`w${week}-${session.day}-${startDate||'x'}`};
     update(prev=>{
       const next = [...prev.workouts,w].sort((a,b)=>b.date.localeCompare(a.date));
       const prs = checkPRs(w, next); if (prs.length) setNewPR(prs);
@@ -234,7 +306,7 @@ export default function App(){
   const openPrefilled = (session,week)=>{
     const d=estDist(session.type,session.duration);
     setEditId(null);
-    setF({type:session.type,dur:session.duration,dist:d,hr:parseHrMid(session.hr),date:new Date().toISOString().slice(0,10),note:`W${week} ${session.title}`,rpe:5,planRef:`w${week}-${session.day}-${startDate||'x'}`});
+    setF({type:session.type,dur:session.duration,dist:d,hr:parseHrMid(session.hr),date:toDateInput(),note:`W${week} ${session.title}`,rpe:5,planRef:`w${week}-${session.day}-${startDate||'x'}`});
     setModal(true); setSheet(null);
   };
 
@@ -246,12 +318,18 @@ export default function App(){
   const restoreUndo = ()=>{ if(!undo)return; update(prev=>({workouts:[...prev.workouts,undo].sort((a,b)=>b.date.localeCompare(a.date))})); setUndo(null); };
 
   const startEdit = w=>{setEditId(w.id);setF({type:w.type,dur:w.duration,dist:w.distance,hr:w.hrAvg,date:w.date,note:w.note||"",rpe:w.rpe||5,planRef:w.planRef});setModal(true);};
-  const closeModal = ()=>{setModal(false);setEditId(null);setF({type:"zone2",dur:45,dist:5,hr:138,date:new Date().toISOString().slice(0,10),note:"",rpe:5});};
+  const duplicateWorkout = w=>{
+    setEditId(null);
+    setFormError("");
+    setF({type:w.type,dur:w.duration,dist:w.distance,hr:w.hrAvg,date:toDateInput(),note:w.note||"",rpe:w.rpe||5,planRef:null});
+    setModal(true);
+  };
+  const closeModal = ()=>{setModal(false);setEditId(null);setFormError("");setF({type:"zone2",dur:45,dist:5,hr:138,date:toDateInput(),note:"",rpe:5});};
 
   const isDone = (week,day)=>workouts.some(w=>w.planRef===`w${week}-${day}-${startDate||'x'}`);
   const doneCount = week=>PLAN.find(p=>p.week===week)?.sessions.filter(s=>isDone(week,s.day)).length||0;
 
-  const today = new Date().toISOString().slice(0,10);
+  const today = toDateInput();
   const wkId = getWk(today);
   const wk = workouts.filter(w=>getWk(w.date)===wkId);
   const wkMin = wk.reduce((s,w)=>s+w.duration,0);
@@ -260,19 +338,19 @@ export default function App(){
   const z2Pct = wkMin>0?Math.round(z2Min/wkMin*100):0;
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
+  const monthStart = toDateInput(new Date(now.getFullYear(),now.getMonth(),1));
   const monthWo = workouts.filter(w=>w.date>=monthStart);
   const totalKm = (statRange==="month"?monthWo:workouts).reduce((s,w)=>s+(w.distance||0),0);
   const totalMin = (statRange==="month"?monthWo:workouts).reduce((s,w)=>s+w.duration,0);
   const totalSess = (statRange==="month"?monthWo:workouts).length;
 
   const weeklyHist=[];
-  for(let i=11;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i*7);const id=getWk(d.toISOString().slice(0,10));const m=getMon(new Date(d));weeklyHist.push({w:`${m.getDate()}.${m.getMonth()+1}`,min:workouts.filter(w=>getWk(w.date)===id).reduce((s,w)=>s+w.duration,0)});}
+  for(let i=11;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i*7);const id=getWk(toDateInput(d));const m=getMon(d);weeklyHist.push({w:`${m.getDate()}.${m.getMonth()+1}`,min:workouts.filter(w=>getWk(w.date)===id).reduce((s,w)=>s+w.duration,0)});}
   const hrTrend=workouts.slice().reverse().slice(-20).map(w=>({d:fS(w.date),hr:w.hrAvg}));
 
   const weekDays=[];
   const mon=getMon(new Date());
-  for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(mon.getDate()+i);const ds=dd.toISOString().slice(0,10);weekDays.push({day:["Mo","Di","Mi","Do","Fr","Sa","So"][i],date:ds,done:workouts.filter(w=>w.date===ds),isToday:ds===today});}
+  for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(mon.getDate()+i);const ds=toDateInput(dd);weekDays.push({day:["Mo","Di","Mi","Do","Fr","Sa","So"][i],date:ds,done:workouts.filter(w=>w.date===ds),isToday:ds===today});}
 
   const curPlan=PLAN.find(p=>p.week===planWeek);
   const filtered=filter==="all"?workouts:workouts.filter(w=>w.type===filter);
@@ -284,7 +362,7 @@ export default function App(){
     const cur = getMon(new Date());
     for (let i = 0; i < 52; i++) {
       const wk = new Date(cur); wk.setDate(cur.getDate() - i * 7);
-      const id = getWk(wk.toISOString().slice(0,10));
+      const id = getWk(toDateInput(wk));
       const hasWorkout = workouts.some(w => getWk(w.date) === id);
       if (hasWorkout) streak++; else break;
     }
@@ -296,7 +374,7 @@ export default function App(){
     if (!workouts.length) return {};
     const runs = workouts.filter(w => w.distance > 0 && ["zone2","intervals","tempo","easy"].includes(w.type));
     const bestPace = runs.length ? runs.reduce((b, w) => { const p = w.duration / w.distance; return p < b.pace ? { pace: p, date: w.date } : b; }, { pace: Infinity, date: "" }) : null;
-    const longestRun = workouts.reduce((b, w) => w.duration > b.dur ? { dur: w.duration, date: w.date } : b, { dur: 0, date: "" });
+    const longestRun = runs.reduce((b, w) => w.duration > b.dur ? { dur: w.duration, date: w.date } : b, { dur: 0, date: "" });
     const mostDist = workouts.reduce((b, w) => (w.distance||0) > b.dist ? { dist: w.distance, date: w.date } : b, { dist: 0, date: "" });
     const weekVols = {};
     workouts.forEach(w => { const k = getWk(w.date); weekVols[k] = (weekVols[k]||0) + w.duration; });
@@ -310,7 +388,7 @@ export default function App(){
   // ═══ WEEKLY REPORT ═══
   const lastWeekReport = useMemo(() => {
     const lw = new Date(); lw.setDate(lw.getDate() - 7);
-    const lwId = getWk(lw.toISOString().slice(0,10));
+    const lwId = getWk(toDateInput(lw));
     const lwWorkouts = workouts.filter(w => getWk(w.date) === lwId);
     if (!lwWorkouts.length) return null;
     const min = lwWorkouts.reduce((s,w) => s+w.duration, 0);
@@ -318,7 +396,7 @@ export default function App(){
     const avgHr = Math.round(lwWorkouts.reduce((s,w) => s+w.hrAvg, 0) / lwWorkouts.length);
     // Compare to week before
     const bw = new Date(); bw.setDate(bw.getDate() - 14);
-    const bwId = getWk(bw.toISOString().slice(0,10));
+    const bwId = getWk(toDateInput(bw));
     const bwMin = workouts.filter(w => getWk(w.date) === bwId).reduce((s,w) => s+w.duration, 0);
     const diff = bwMin > 0 ? Math.round((min - bwMin) / bwMin * 100) : 0;
     return { sessions: lwWorkouts.length, min, dist: Math.round(dist*10)/10, avgHr, diff };
@@ -341,6 +419,12 @@ export default function App(){
     </>
   );
 
+  const storageBanner = storageError ? (
+    <div className="storage-banner" role="alert" style={{background:"rgba(196,106,106,0.1)",border:"1px solid rgba(196,106,106,0.32)",borderRadius:14,padding:"11px 14px",color:"#d98a8a",fontSize:12,lineHeight:1.45,position:"relative",zIndex:80}}>
+      {storageError}
+    </div>
+  ) : null;
+
   // ═══ STRENGTH MODE — Full takeover ═══
   if (mode === "strength") {
     return (
@@ -348,8 +432,11 @@ export default function App(){
         <link href={fontLink} rel="stylesheet"/>
         <style>{globalStyles}</style>
         {bgLayers}
+        {storageBanner}
         <div style={{position:"relative",zIndex:1}}>
-          <StrengthSection C={C} data={data} update={update} onBack={()=>setMode(null)} />
+          <Suspense fallback={<div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:C.bg}}><div aria-label="Kraftbereich wird geladen" style={{width:28,height:28,border:`3px solid ${C.sky}`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite"}}/></div>}>
+            <StrengthSection C={C} data={data} update={update} onBack={backToModes} />
+          </Suspense>
         </div>
       </div>
     );
@@ -362,39 +449,40 @@ export default function App(){
         <link href={fontLink} rel="stylesheet"/>
         <style>{globalStyles}</style>
         {bgLayers}
-        <div style={{position:"relative",zIndex:1,textAlign:"center",width:"100%",maxWidth:360}}>
+        <div className="mode-selector-content" style={{position:"relative",zIndex:1,textAlign:"center"}}>
+          <div style={{width:48,height:48,borderRadius:16,display:"grid",placeItems:"center",margin:"0 auto 16px",background:`linear-gradient(145deg, ${C.ember}22, ${C.sky}10)`,border:`1px solid ${C.ember}30`,color:C.ember,boxShadow:`0 12px 36px ${C.ember}15`}}><Activity size={23} strokeWidth={1.8}/></div>
           <div style={{fontSize:10,fontWeight:600,color:C.ember,letterSpacing:5,textTransform:"uppercase",marginBottom:12,animation:"fadeIn 0.4s ease",fontFamily:bodyFont}}>PERFORMANCE TRACKER</div>
           <div style={{fontSize:38,fontWeight:300,letterSpacing:6,marginBottom:8,animation:"fadeUp 0.5s ease",fontFamily:headFont,textTransform:"uppercase",lineHeight:1}}>Was trainierst du?</div>
-          <div style={{fontSize:12,color:C.muted,marginBottom:44,animation:"fadeUp 0.5s ease 0.1s both",letterSpacing:1}}>Wähle deinen Trainingsbereich</div>
+          <div style={{fontSize:12,color:C.sub,marginBottom:36,animation:"fadeUp 0.5s ease 0.1s both",letterSpacing:0.5}}>{data.workouts.length + data.strengthLog.length > 0 ? `${data.workouts.length + data.strengthLog.length} Sessions sicher auf diesem Gerät gespeichert` : "Wähle deinen Trainingsbereich"}</div>
 
-          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div className="mode-card-grid">
             {[
-              {mode:"cardio",icon:"🏃",accent:C.ember,label:"CARDIO",title:"Ausdauer",desc:"10-Wochen Laufplan, Zone 2, Intervalle",delay:"0.15s"},
-              {mode:"strength",icon:"🏋️",accent:C.sky,label:"KRAFT",title:"Krafttraining",desc:"Progressive Overload, Split-Tage, Recovery",delay:"0.25s"},
+              {mode:"cardio",Icon:Activity,accent:C.ember,label:"CARDIO",title:"Ausdauer",desc:"10-Wochen-Plan, Zone 2 und Intervalle",meta:`${data.workouts.length} Cardio-Sessions`,delay:"0.15s"},
+              {mode:"strength",Icon:Dumbbell,accent:C.sky,label:"KRAFT",title:"Krafttraining",desc:"Progressive Overload, Splits und Recovery",meta:`${data.strengthLog.length} Kraft-Sessions`,delay:"0.25s"},
             ].map(item => (
-              <div key={item.mode} className="card3d" style={{animation:`fadeUp 0.4s ease ${item.delay} both`}}
-                onTouchStart={e=>{const el=e.currentTarget.querySelector('.card3d-inner');if(el){el.style.transform='rotateX(3deg) rotateY(-2deg) scale(1.02)';el.style.boxShadow=`0 12px 40px rgba(0,0,0,0.4), 0 0 30px ${item.accent}15`}}}
-                onTouchEnd={e=>{const el=e.currentTarget.querySelector('.card3d-inner');if(el){el.style.transform='';el.style.boxShadow=''}}}
-              >
-                <div className="card3d-inner" onClick={()=>setMode(item.mode)} style={{
+              <div key={item.mode} className="card3d" style={{animation:`fadeUp 0.4s ease ${item.delay} both`}}>
+                <button type="button" className="card3d-inner training-mode-card" onClick={()=>selectMode(item.mode)} style={{
                   background:`linear-gradient(145deg, ${C.surface}, rgba(18,18,26,0.95))`,
                   border:`1px solid ${C.border}`,borderRadius:20,padding:"24px 24px 20px",
-                  cursor:"pointer",fontFamily:"inherit",textAlign:"left",position:"relative",overflow:"hidden",
+                  cursor:"pointer",fontFamily:"inherit",textAlign:"left",position:"relative",overflow:"hidden",color:C.text,
                 }}>
                   <div style={{position:"absolute",top:0,right:0,width:120,height:120,background:`radial-gradient(circle at 80% 20%, ${item.accent}08, transparent 70%)`,pointerEvents:"none"}} />
                   <div style={{display:"flex",alignItems:"flex-start",gap:16,position:"relative"}}>
-                    <div style={{width:48,height:48,borderRadius:14,background:`linear-gradient(135deg, ${item.accent}18, ${item.accent}08)`,border:`1px solid ${item.accent}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>{item.icon}</div>
+                    <div style={{width:48,height:48,borderRadius:14,background:`linear-gradient(135deg, ${item.accent}18, ${item.accent}08)`,border:`1px solid ${item.accent}25`,display:"flex",alignItems:"center",justifyContent:"center",color:item.accent,flexShrink:0}}><item.Icon size={23} strokeWidth={1.8}/></div>
                     <div style={{flex:1}}>
                       <div style={{fontSize:10,fontWeight:700,color:item.accent,letterSpacing:4,marginBottom:4,fontFamily:bodyFont}}>{item.label}</div>
                       <div style={{fontSize:20,fontWeight:300,color:C.text,marginBottom:6,fontFamily:headFont,letterSpacing:2,textTransform:"uppercase"}}>{item.title}</div>
                       <div style={{fontSize:12,color:C.muted,lineHeight:1.5}}>{item.desc}</div>
+                      <div style={{fontSize:10,color:C.dim,marginTop:12,fontWeight:600,letterSpacing:0.5}}>{item.meta}</div>
                     </div>
-                    <div style={{color:C.dim,fontSize:18,marginTop:4}}>›</div>
+                    <ArrowRight size={18} color={item.accent} style={{marginTop:4,opacity:0.72}}/>
                   </div>
-                </div>
+                </button>
               </div>
             ))}
           </div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:7,marginTop:24,color:C.dim,fontSize:10,letterSpacing:0.4}}><ShieldCheck size={14}/> Lokal gespeichert · Kein Konto nötig</div>
+          {storageBanner}
         </div>
       </div>
     );
@@ -408,19 +496,20 @@ export default function App(){
     <div style={{background:`radial-gradient(ellipse at 50% 30%, rgba(196,149,106,0.04) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,164,184,0.03) 0%, transparent 50%), linear-gradient(180deg, #0a0a0f 0%, #0d0d14 50%, #0a0a0f 100%)`,minHeight:"100vh",color:C.text,fontFamily:bodyFont,position:"relative",isolation:"isolate"}}>
       <link href={fontLink} rel="stylesheet"/>
       <style>{globalStyles}</style>
+      {storageBanner}
 
       {/* HEADER — no backdrop-filter for iOS Safari stability */}
       <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"#0b0b12"}}>
-        <div style={{padding:"16px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div className="app-shell-header" style={{padding:"16px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
-            <button onClick={()=>setMode(null)} style={{fontSize:11,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:bodyFont,fontWeight:600,padding:0,marginBottom:4,letterSpacing:3,textTransform:"uppercase"}}>&larr; ZURÜCK</button>
+            <button onClick={backToModes} style={{fontSize:11,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:bodyFont,fontWeight:600,padding:0,marginBottom:4,letterSpacing:3,textTransform:"uppercase"}}>&larr; ZURÜCK</button>
             <div style={{fontSize:28,fontWeight:300,letterSpacing:6,fontFamily:headFont,textTransform:"uppercase"}}>Cardio</div>
           </div>
-          <button onClick={()=>{closeModal();setModal(true)}} style={{width:44,height:44,borderRadius:14,background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:"#0a0a0f",fontWeight:300,lineHeight:1,boxShadow:`0 4px 20px rgba(196,149,106,0.2)`}}>+</button>
+          <button aria-label="Workout hinzufügen" onClick={()=>{closeModal();setModal(true)}} style={{width:44,height:44,borderRadius:14,background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#0a0a0f",boxShadow:`0 4px 20px rgba(196,149,106,0.2)`}}><Plus size={22}/></button>
         </div>
-        <div style={{display:"flex",gap:0,padding:"14px 20px 0"}}>
+        <div className="app-shell-tabs" role="tablist" aria-label="Cardio-Bereiche" style={{display:"flex",gap:0,padding:"14px 20px 0"}}>
           {[["dash","Übersicht"],["plan","Programm"],["history","Verlauf"],["badges","Erfolge"]].map(([k,l])=>(
-            <button key={k} onClick={()=>setView(k)} style={{padding:"8px 14px 12px",background:"transparent",border:"none",borderBottom:view===k?`2.5px solid ${C.ember}`:"2.5px solid transparent",color:view===k?C.text:C.muted,fontSize:13,fontWeight:view===k?700:400,cursor:"pointer",fontFamily:"inherit",transition:"all 0.2s"}}>{l}</button>
+            <button role="tab" aria-selected={view===k} key={k} onClick={()=>setView(k)} style={{padding:"8px 14px 12px",background:"transparent",border:"none",borderBottom:view===k?`2.5px solid ${C.ember}`:"2.5px solid transparent",color:view===k?C.text:C.muted,fontSize:13,fontWeight:view===k?700:400,cursor:"pointer",fontFamily:"inherit",transition:"all 0.2s",whiteSpace:"nowrap"}}>{l}</button>
           ))}
         </div>
       </div>
@@ -503,10 +592,13 @@ export default function App(){
 
       {/* MODAL */}
       {modal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",backdropFilter:"blur(10px)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)closeModal()}}>
-          <div style={{background:C.surface,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",maxHeight:"88vh",overflowY:"auto",animation:"slideUp 0.25s ease-out"}}>
+        <div role="presentation" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.72)",backdropFilter:"blur(12px)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)closeModal()}}>
+          <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="cardio-workout-title" style={{background:C.surface,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:520,padding:"16px 22px calc(28px + env(safe-area-inset-bottom, 0px))",maxHeight:"92dvh",overflowY:"auto",animation:"slideUp 0.25s ease-out"}}>
             <div style={{width:40,height:5,borderRadius:3,background:C.border,margin:"0 auto 20px"}}/>
-            <div style={{fontSize:22,fontWeight:800,marginBottom:22,letterSpacing:-0.5}}>{editId?"Bearbeiten":"Neues Workout"}</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+              <div id="cardio-workout-title" style={{fontSize:22,fontWeight:800,letterSpacing:-0.5}}>{editId?"Workout bearbeiten":"Neues Workout"}</div>
+              <button className="icon-button" aria-label="Dialog schließen" onClick={closeModal} style={{width:36,height:36,borderRadius:11,display:"grid",placeItems:"center",background:C.card,border:`1px solid ${C.border}`,color:C.muted,cursor:"pointer"}}><X size={18}/></button>
+            </div>
             <div style={{marginBottom:18}}>
               <div style={{fontSize:12,color:C.muted,marginBottom:8,fontWeight:600,letterSpacing:1.5,textTransform:"uppercase"}}>Typ</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
@@ -514,7 +606,7 @@ export default function App(){
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-              {[["date","Datum","date",f.date],["dur","Dauer (Min)","number",f.dur],["dist","Distanz (km)","number",f.dist],["hr","Avg. HR","number",f.hr]].map(([k,label,type,val])=>(<div key={k}><div style={{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600,letterSpacing:0.5}}>{label}</div><input type={type} value={val} onChange={e=>up(k,e.target.value)} step={k==="dist"?0.1:1} style={inp}/></div>))}
+              {[["date","Datum","date",f.date],["dur","Dauer (Min)","number",f.dur],["dist","Distanz (km)","number",f.dist],["hr","Ø Herzfrequenz","number",f.hr]].map(([k,label,type,val])=>(<label key={k}><span style={{display:"block",fontSize:12,color:C.muted,marginBottom:6,fontWeight:600,letterSpacing:0.5}}>{label}</span><input type={type} value={val} onChange={e=>up(k,e.target.value)} min={k==="dur"?1:k==="dist"||k==="hr"?0:undefined} max={k==="dur"?1440:k==="dist"?1000:k==="hr"?240:undefined} step={k==="dist"?0.1:1} style={inp}/></label>))}
             </div>
             <div style={{marginBottom:14}}>
               <div style={{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}}>RPE <span style={{color:C.ember,fontWeight:800}}>{f.rpe}</span>/10</div>
@@ -524,16 +616,17 @@ export default function App(){
               <div style={{fontSize:12,color:C.muted,marginBottom:6,fontWeight:600}}>Notiz</div>
               <input value={f.note} onChange={e=>up("note",e.target.value)} placeholder="Optional..." style={inp}/>
             </div>
+            {formError && <div role="alert" style={{padding:"10px 12px",borderRadius:10,background:"rgba(196,106,106,0.11)",border:"1px solid rgba(196,106,106,0.3)",color:"#d98a8a",fontSize:12,lineHeight:1.4,marginBottom:12}}>{formError}</div>}
             <div style={{display:"flex",gap:10}}>
               <button onClick={doSave} style={{flex:1,padding:"15px 0",background:C.ember,color:"#fff",border:"none",borderRadius:14,fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 4px 16px ${C.ember}44`}}>{editId?"Speichern":"Eintragen"}</button>
-              <button onClick={closeModal} style={{padding:"15px 22px",background:C.card,color:C.muted,border:`1px solid ${C.border}`,borderRadius:14,fontSize:15,cursor:"pointer",fontFamily:"inherit",fontWeight:500}}>Abb.</button>
+              <button onClick={closeModal} style={{padding:"15px 20px",background:C.card,color:C.muted,border:`1px solid ${C.border}`,borderRadius:14,fontSize:14,cursor:"pointer",fontFamily:"inherit",fontWeight:600}}>Abbrechen</button>
             </div>
           </div>
         </div>
       )}
 
       {/* CONTENT — explicit stacking context for iOS Safari stability */}
-      <div style={{padding:"22px 20px 48px",position:"relative",zIndex:1}}>
+      <main className="app-shell-content" style={{padding:"22px 20px 48px",position:"relative",zIndex:1}}>
 
         {/* ═══ DASHBOARD ═══ */}
         {view==="dash"&&(
@@ -543,7 +636,7 @@ export default function App(){
                 <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Plan starten</div>
                 <div style={{fontSize:13,color:C.sub,marginBottom:14,lineHeight:1.5}}>Wähle den Montag, an dem dein 10-Wochen-Plan beginnt.</div>
                 <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                  <input type="date" defaultValue={getMon(new Date()).toISOString().slice(0,10)} id="sd" style={{...inp,flex:1}}/>
+                  <input type="date" defaultValue={toDateInput(getMon(new Date()))} id="sd" style={{...inp,flex:1}}/>
                   <button onClick={()=>{const v=document.getElementById("sd").value;if(v)setStartDate(v)}} style={{padding:"13px 22px",background:C.ember,color:"#fff",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Starten</button>
                 </div>
               </div>
@@ -569,7 +662,7 @@ export default function App(){
             })()}
 
             {/* Streak + Rings row */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:18}}>
+            <div className="metrics-grid" style={{gap:8,marginBottom:18}}>
               <div style={{background:C.surface,borderRadius:18,padding:"16px 8px",border:`1px solid ${C.border}`,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                 <div style={{fontSize:28,fontWeight:900,color:weekStreak>=3?C.gold:C.dim,letterSpacing:-1}}>{weekStreak}</div>
                 <div style={{fontSize:9,color:C.muted,fontWeight:700,letterSpacing:1,textTransform:"uppercase",textAlign:"center"}}>WOCHEN STREAK</div>
@@ -747,9 +840,10 @@ export default function App(){
                         </div>
                         {w.note&&<div style={{fontSize:12,color:C.dim,marginTop:3}}>{w.note}</div>}
                       </div>
-                      <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
-                        <button onClick={()=>startEdit(w)} style={{width:44,height:36,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,color:C.muted,cursor:"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit",fontWeight:600}}>Edit</button>
-                        <button onClick={()=>remove(w.id)} style={{width:44,height:36,borderRadius:10,background:C.emberBg,border:`1px solid ${C.ember}30`,color:C.ember,cursor:"pointer",fontSize:14,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>&times;</button>
+                      <div style={{display:"flex",gap:5,flexShrink:0}}>
+                        <button className="icon-button" aria-label={`${t.label} vom ${fL(w.date)} duplizieren`} title="Heute erneut eintragen" onClick={()=>duplicateWorkout(w)} style={{width:36,height:36,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,color:C.sky,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Copy size={15}/></button>
+                        <button className="icon-button" aria-label={`${t.label} vom ${fL(w.date)} bearbeiten`} onClick={()=>startEdit(w)} style={{width:36,height:36,borderRadius:10,background:C.card,border:`1px solid ${C.border}`,color:C.muted,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Pencil size={15}/></button>
+                        <button className="icon-button" aria-label={`${t.label} vom ${fL(w.date)} löschen`} onClick={()=>remove(w.id)} style={{width:36,height:36,borderRadius:10,background:C.emberBg,border:`1px solid ${C.ember}30`,color:C.ember,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={15}/></button>
                       </div>
                     </div>
                   );
@@ -848,7 +942,7 @@ export default function App(){
             )}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
