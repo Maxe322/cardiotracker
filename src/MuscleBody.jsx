@@ -59,7 +59,7 @@ const recFreq = (pct) => {
 };
 
 // ═══ COMPONENT ═══
-export default function MuscleRecoveryPanel({ C, recMap }) {
+export default function MuscleRecoveryPanel({ C, recMap, recoveryDetails = {} }) {
   const [selected, setSelected] = useState(null); // our muscle ID
 
   // Build exercise data for the highlighter
@@ -154,6 +154,7 @@ export default function MuscleRecoveryPanel({ C, recMap }) {
       {/* Tooltip */}
       {selected && (() => {
         const pct = recMap[selected] ?? 0;
+        const detail = recoveryDetails[selected];
         const col = recColor(pct);
         const lab = recLabel(pct);
         return (
@@ -170,7 +171,7 @@ export default function MuscleRecoveryPanel({ C, recMap }) {
               fontSize: 10, fontWeight: 700, letterSpacing: 2.5, textTransform: "uppercase",
               color: "rgba(232,228,223,0.85)", fontFamily: "'Manrope',sans-serif",
             }}>
-              {NAMES[selected]} · {lab} · {pct}%
+              {NAMES[selected]} · {lab} · {pct}%{detail?.hoursRemaining > 0 ? ` · ~${detail.hoursRemaining}h` : ""}
             </span>
           </div>
         );
