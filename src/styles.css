@@ -34,12 +34,12 @@ select:focus-visible,
 }
 
 .mode-selector-content {
-  width: min(100%, 780px);
+  width: min(100%, 1060px);
 }
 
 .mode-card-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -85,6 +85,63 @@ select:focus-visible,
   border-color: rgba(255, 255, 255, 0.16) !important;
 }
 
+.coach-shell {
+  width: min(100%, 980px);
+}
+
+.coach-field,
+.coach-range {
+  display: block;
+  padding: 12px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: rgba(24, 24, 35, 0.7);
+}
+
+.coach-field > span,
+.coach-range > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #7a756d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.coach-field > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.coach-field input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #e8e4df;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.coach-field strong,
+.coach-range strong {
+  color: #9b8fb8;
+  font-size: 11px;
+}
+
+.coach-range input {
+  width: 100%;
+}
+
+.spin-icon {
+  animation: spin 0.9s linear infinite;
+}
+
 @media (max-width: 720px) {
   .mode-selector-content {
     width: min(100%, 420px);
@@ -101,6 +158,12 @@ select:focus-visible,
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 10px !important;
+  }
+
+  .readiness-layout {
+    grid-template-columns: 1fr !important;
+    justify-items: center;
+    text-align: center;
   }
 }
 
@@ -120,6 +183,10 @@ select:focus-visible,
 
   .storage-banner {
     width: calc(100% - 28px);
+  }
+
+  .coach-form-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 

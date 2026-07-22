@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
-import { CalendarDays, Database, Download, Dumbbell, History, Scan, SlidersHorizontal, Sparkles } from "lucide-react";
+import { CalendarDays, Database, Download, Dumbbell, Ghost, History, Scan, SlidersHorizontal, Sparkles } from "lucide-react";
 import MuscleRecoveryPanel from "./MuscleBody";
 import { formatDate, getISOWeekKey, parseDateInput, toDateInput } from "./dateUtils";
 
@@ -564,7 +564,7 @@ function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNot
 }
 
 // ═══ RECOVERY MODEL ═══
-function muscleRec(muscle, log, exList=EX) {
+function muscleRecoveryDetail(muscle, log, exList=EX) {
   const now = Date.now(); let lastTime = 0; let lastVolume = 0;
   for (const w of log) for (const ex of (w.exercises||[])) {
     const d = exList.find(e => e.id === ex.exerciseId) || EX.find(e => e.id === ex.exerciseId);
@@ -577,11 +577,37 @@ function muscleRec(muscle, log, exList=EX) {
       }
     }
   }
-  if (!lastTime) return 100;
+  if (!lastTime) return { pct:100, lastDate:null, recoveryDays:0, hoursRemaining:0 };
   const daysSince = (now - lastTime) / (1000*60*60*24);
   // Higher volume = longer recovery needed (2-4 days scale)
   const recoveryDays = lastVolume > 5000 ? 4 : lastVolume > 2000 ? 3 : 2;
-  return Math.min(100, Math.round(daysSince / recoveryDays * 100));
+  const pct = Math.min(100, Math.max(0, Math.round(daysSince / recoveryDays * 100)));
+  return {
+    pct,
+    lastDate:toDateInput(new Date(lastTime)),
+    recoveryDays,
+    hoursRemaining:Math.max(0, Math.ceil((recoveryDays - daysSince) * 24)),
+  };
+}
+
+function muscleRec(muscle, log, exList=EX) { return muscleRecoveryDetail(muscle, log, exList).pct; }
+
+function getGhostComparison(currentExercise, previous) {
+  if (!previous) return null;
+  const currentSets = (currentExercise.sets || []).filter(set => set.type !== "W" && set.done);
+  const previousSets = (previous.sets || []).filter(set => set.type !== "W");
+  const targetVolume = previousSets.reduce((sum, set) => sum + (+set.weight || 0) * (+set.reps || 0), 0);
+  const currentVolume = currentSets.reduce((sum, set) => sum + (+set.weight || 0) * (+set.reps || 0), 0);
+  const completedTargetVolume = previousSets.slice(0, currentSets.length).reduce((sum, set) => sum + (+set.weight || 0) * (+set.reps || 0), 0);
+  const delta = Math.round(currentVolume - completedTargetVolume);
+  return {
+    targetVolume:Math.round(targetVolume),
+    currentVolume:Math.round(currentVolume),
+    delta,
+    progress:targetVolume > 0 ? Math.min(100, Math.round(currentVolume / targetVolume * 100)) : 0,
+    setsDone:currentSets.length,
+    setsTarget:previousSets.length,
+  };
 }
 
 // ═══ REST TIMER DEFAULTS (seconds) ═══
@@ -604,14 +630,14 @@ function parseActiveWorkout(raw) {
 function parseBackup(raw) {
   const parsed = JSON.parse(raw);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Ungültiges Backup-Format");
-  for (const key of ["workouts", "strengthLog", "strengthTemplates", "trainingDays", "customExercises"]) {
+  for (const key of ["workouts", "strengthLog", "strengthTemplates", "trainingDays", "customExercises", "readinessCheckIns", "healthMetrics"]) {
     if (parsed[key] !== undefined && !Array.isArray(parsed[key])) throw new Error(`${key} hat ein ungültiges Format`);
   }
   return parsed;
 }
 
-export default function StrengthTab({ C, data, update, onBack }) {
-  const [sub, setSub] = useState("log");
+export default function StrengthTab({ C, data, update, onBack, initialSub = "log" }) {
+  const [sub, setSub] = useState(initialSub || "log");
   const [detailEx, setDetailEx] = useState(null); // exercise detail view
   const [active, setActive] = useState(() => {
     try { return parseActiveWorkout(localStorage.getItem("cardio-activeWorkout")); } catch { return null; }
@@ -641,9 +667,12 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const [chatLoading, setChatLoading] = useState(false);
   const [gymMode, setGymMode] = useState(false); // compact gym logging UI
   const [gymExIdx, setGymExIdx] = useState(0); // current exercise index in gym mode
+  const [ghostMode, setGhostMode] = useState(true);
   const chatEndRef = useRef(null);
   const chatInputRef = useRef(null);
   const timerRef = useRef(null);
+
+  useEffect(() => { if (initialSub) setSub(initialSub); }, [initialSub]);
 
   // ═══ PERSIST ACTIVE WORKOUT ═══
   useEffect(() => {
@@ -1427,7 +1456,12 @@ REGELN FÜR DEINE ANTWORTEN:
     return vol;
   }, [sLog]);
 
-  const recMap = useMemo(() => { const r = {}; MG.forEach(m => { r[m.id] = muscleRec(m.id, sLog, ALL_EX); }); return r; }, [sLog, ALL_EX]);
+  const recoveryDetails = useMemo(() => {
+    const details = {};
+    MG.forEach(muscle => { details[muscle.id] = muscleRecoveryDetail(muscle.id, sLog, ALL_EX); });
+    return details;
+  }, [sLog, ALL_EX]);
+  const recMap = useMemo(() => Object.fromEntries(Object.entries(recoveryDetails).map(([muscle, detail]) => [muscle, detail.pct])), [recoveryDetails]);
 
   // ═══ DELOAD / PERIODIZATION DETECTION ═══
   const deloadAdvice = useMemo(() => {
@@ -1697,8 +1731,9 @@ REGELN FÜR DEINE ANTWORTEN:
                     // Merge: combine logs, keep latest templates/days/equipment/notes
                     const current = JSON.parse(localStorage.getItem("cardio-v4") || "{}");
                     const mergeLog = (a=[], b=[]) => {
-                      const ids = new Set(a.map(w => w.id));
-                      return [...a, ...b.filter(w => !ids.has(w.id))].sort((x,y) => y.date?.localeCompare(x.date));
+                      const itemKey = item => item?.id || item?.date || item?.exerciseId || JSON.stringify(item);
+                      const ids = new Set(a.map(itemKey));
+                      return [...a, ...b.filter(w => !ids.has(itemKey(w)))].sort((x,y) => (y.date||"").localeCompare(x.date||""));
                     };
                     const merged = {
                       workouts: mergeLog(current.workouts, imported.workouts),
@@ -1708,6 +1743,10 @@ REGELN FÜR DEINE ANTWORTEN:
                       trainingDays: current.trainingDays?.length ? current.trainingDays : (imported.trainingDays || []),
                       userEquipment: current.userEquipment || imported.userEquipment,
                       exerciseNotes: { ...(imported.exerciseNotes||{}), ...(current.exerciseNotes||{}) },
+                      customExercises: mergeLog(current.customExercises, imported.customExercises),
+                      readinessCheckIns: mergeLog(current.readinessCheckIns, imported.readinessCheckIns),
+                      healthMetrics: mergeLog(current.healthMetrics, imported.healthMetrics),
+                      integrationSources: { ...(imported.integrationSources||{}), ...(current.integrationSources||{}) },
                       aiApiKey: current.aiApiKey || "",
                     };
                     localStorage.setItem("cardio-v4", JSON.stringify(merged));
@@ -2256,6 +2295,7 @@ REGELN FÜR DEINE ANTWORTEN:
               const d = ALL_EX.find(e => e.id === ex.exerciseId);
               const mg = MG.find(m => m.id === d?.m);
               const prev = getPrev(ex.exerciseId);
+              const ghost = ghostMode ? getGhostComparison(ex, prev) : null;
               return (
                 <div style={{flex:1,overflowY:"auto",padding:"16px 20px",WebkitOverflowScrolling:"touch"}}>
                   {/* Exercise name */}
@@ -2263,6 +2303,10 @@ REGELN FÜR DEINE ANTWORTEN:
                     <div style={{fontSize:22,fontWeight:800,color:C.text}}>{d?.name||"?"}</div>
                     <div style={{fontSize:12,color:mg?.color,fontWeight:600}}>{mg?.name}</div>
                     {prev && <div style={{fontSize:11,color:C.dim,marginTop:4}}>Letztes Mal: {prev.sets.map(s=>`${s.weight}×${s.reps}`).join(" / ")}</div>}
+                    {ghost && <div style={{marginTop:9,padding:"9px 10px",borderRadius:10,background:`${C.violet}0c`,border:`1px solid ${C.violet}22`}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:9,fontWeight:700,letterSpacing:1.2,color:C.violet}}><span style={{display:"flex",alignItems:"center",gap:5}}><Ghost size={13}/> GHOST</span><span>{ghost.currentVolume}/{ghost.targetVolume} kg · {ghost.delta>=0?"+":""}{ghost.delta}</span></div>
+                      <div style={{height:4,background:C.card,borderRadius:3,overflow:"hidden",marginTop:6}}><div style={{width:`${ghost.progress}%`,height:"100%",background:C.violet,borderRadius:3,transition:"width .25s ease"}}/></div>
+                    </div>}
                   </div>
 
                   {/* Sets — large touch targets */}
@@ -2341,9 +2385,12 @@ REGELN FÜR DEINE ANTWORTEN:
           </div>
         ) : (
         <div>
+          <button onClick={()=>setGhostMode(value=>!value)} aria-pressed={ghostMode} style={{width:"100%",padding:"11px 13px",background:ghostMode?`${C.violet}10`:C.card,border:`1px solid ${ghostMode?C.violet+"2d":C.border}`,borderRadius:14,color:ghostMode?C.violet:C.muted,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:1.8,textTransform:"uppercase",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <span style={{display:"flex",alignItems:"center",gap:8}}><Ghost size={17}/> Ghost Workout</span><span>{ghostMode?"AKTIV":"AUS"}</span>
+          </button>
           {/* Gym Mode toggle */}
           <button onClick={()=>{setGymMode(true);setGymExIdx(0)}} style={{width:"100%",padding:"10px 0",background:`linear-gradient(135deg, ${C.violet}10, ${C.sky}08)`,border:`1px solid ${C.violet}25`,borderRadius:14,color:C.violet,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2.5,textTransform:"uppercase",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            <span style={{fontSize:16}}>⌚</span> GYM MODE
+            <Dumbbell size={16}/> LIVE WORKOUT COCKPIT
           </button>
           {/* REST TIMER with countdown */}
           {restStart && (
@@ -2366,6 +2413,7 @@ REGELN FÜR DEINE ANTWORTEN:
             const mg = MG.find(m => m.id === def?.m);
             const prev = getPrev(ex.exerciseId);
             const sug = prev ? suggestWeight(ex.exerciseId, prev.sets, [8,12], sLog, recMap[ALL_EX.find(e=>e.id===ex.exerciseId)?.m]||100, ALL_EX) : null;
+            const ghost = ghostMode ? getGhostComparison(ex, prev) : null;
             return (
               <div key={ei} style={{background:C.surface,borderRadius:16,padding:"16px 16px 12px",border:`1px solid ${C.border}`,marginBottom:10,borderLeft:`4px solid ${mg?.color||C.muted}`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -2406,6 +2454,10 @@ REGELN FÜR DEINE ANTWORTEN:
                 )}
                 {sug && <div style={{background:C.goldBg,borderRadius:10,padding:"8px 12px",marginBottom:8,border:`1px solid ${C.gold}20`,fontSize:12,color:C.gold,fontWeight:600}}>{sug.reason}</div>}
                 {prev && <div style={{fontSize:11,color:C.dim,marginBottom:6}}>Letztes Mal ({formatDate(prev.date,{day:"2-digit",month:"2-digit"})}): {prev.sets.map(s=>`${s.weight}x${s.reps}${s.type&&s.type!=="N"?` (${s.type})`:""}${s.rpe?` @${s.rpe}`:""}`).join(" / ")}</div>}
+                {ghost && <div style={{background:`${C.violet}0a`,borderRadius:10,padding:"8px 11px",marginBottom:8,border:`1px solid ${C.violet}20`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:9,fontWeight:700,letterSpacing:1.2,color:C.violet}}><span style={{display:"flex",alignItems:"center",gap:5}}><Ghost size={13}/> GHOST-VOLUMEN</span><span>{ghost.currentVolume}/{ghost.targetVolume} kg · {ghost.delta>=0?"+":""}{ghost.delta}</span></div>
+                  <div style={{height:4,background:C.card,borderRadius:3,overflow:"hidden",marginTop:6}}><div style={{width:`${ghost.progress}%`,height:"100%",background:C.violet,borderRadius:3,transition:"width .25s ease"}}/></div>
+                </div>}
 
                 {/* ═══ NOTES AREA ═══ */}
                 {(()=>{
@@ -2821,15 +2873,15 @@ REGELN FÜR DEINE ANTWORTEN:
           {/* Premium Recovery Panel */}
           <div style={{padding:"14px 0 0"}}>
             <div style={sty.lbl}>MUSKEL-RECOVERY</div>
-            <MuscleRecoveryPanel C={C} recMap={recMap} />
+            <MuscleRecoveryPanel C={C} recMap={recMap} recoveryDetails={recoveryDetails} />
           </div>
 
           {/* Recovery bars — detail view */}
           <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:16}}>
-            {MG.map(m=>{const r=recMap[m.id]||0;const col=r>=80?"#5db86a":r>=50?"#d4a24e":"#c9524a";
+            {MG.map(m=>{const r=recMap[m.id]||0;const detail=recoveryDetails[m.id];const col=r>=80?"#5db86a":r>=50?"#d4a24e":"#c9524a";
               return(<div key={m.id} style={{background:C.surface,borderRadius:14,padding:"12px 16px",border:`1px solid ${C.border}`,backdropFilter:"blur(20px)"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <span style={{fontSize:10,fontWeight:700,letterSpacing:2.5,textTransform:"uppercase"}}>{m.name}</span>
+                  <div><span style={{fontSize:10,fontWeight:700,letterSpacing:2.5,textTransform:"uppercase"}}>{m.name}</span>{detail?.lastDate&&<div style={{fontSize:9,color:C.dim,marginTop:3}}>Zuletzt {formatDate(detail.lastDate,{day:"2-digit",month:"short"})}{detail.hoursRemaining>0?` · bereit in ca. ${detail.hoursRemaining}h`:" · bereit"}</div>}</div>
                   <span style={{fontSize:13,fontWeight:700,color:col,fontVariantNumeric:"tabular-nums"}}>{r}%</span>
                 </div>
                 <div style={{height:3,background:"rgba(255,255,255,0.04)",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${r}%`,background:`linear-gradient(90deg, ${col}88, ${col})`,borderRadius:2,transition:"width 1s ease",boxShadow:`0 0 8px ${col}33`}}/></div>
