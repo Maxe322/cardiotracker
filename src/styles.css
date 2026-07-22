@@ -1,0 +1,135 @@
+:root {
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  min-height: 100%;
+  background: #09090e;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible {
+  outline: 3px solid rgba(207, 161, 116, 0.52) !important;
+  outline-offset: 3px;
+}
+
+.mode-selector-content {
+  width: min(100%, 780px);
+}
+
+.mode-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.training-mode-card {
+  width: 100%;
+  min-height: 184px;
+  appearance: none;
+}
+
+.app-shell-header,
+.app-shell-tabs,
+.app-shell-content,
+.strength-shell-content {
+  width: min(100%, 1180px);
+  margin-inline: auto;
+}
+
+.app-shell-tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.storage-banner {
+  width: min(calc(100% - 40px), 1140px);
+  margin: 14px auto 0;
+}
+
+.modal-panel {
+  overscroll-behavior: contain;
+  box-shadow: 0 -24px 80px rgba(0, 0, 0, 0.65);
+}
+
+.icon-button {
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.icon-button:hover {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+@media (max-width: 720px) {
+  .mode-selector-content {
+    width: min(100%, 420px);
+  }
+
+  .mode-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .training-mode-card {
+    min-height: auto;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-shell-header {
+    padding-inline: 16px !important;
+  }
+
+  .app-shell-tabs {
+    padding-inline: 12px !important;
+  }
+
+  .app-shell-content,
+  .strength-shell-content {
+    padding-inline: 14px !important;
+  }
+
+  .storage-banner {
+    width: calc(100% - 28px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

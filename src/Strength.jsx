@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import { CalendarDays, Database, Download, Dumbbell, History, Scan, SlidersHorizontal, Sparkles } from "lucide-react";
 import MuscleRecoveryPanel from "./MuscleBody";
+import { formatDate, getISOWeekKey, parseDateInput, toDateInput } from "./dateUtils";
 
 const MG = [
   { id:"chest", name:"Brust", color:"#c4956a" },
@@ -328,15 +330,15 @@ function getExerciseStats(exerciseId, log, allEx) {
   const now = new Date();
   const d14 = new Date(now); d14.setDate(d14.getDate() - 14);
   const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
-  const freq14 = hist.filter(h => new Date(h.date) >= d14).length;
-  const freq30 = hist.filter(h => new Date(h.date) >= d30).length;
+  const freq14 = hist.filter(h => parseDateInput(h.date) >= d14).length;
+  const freq30 = hist.filter(h => parseDateInput(h.date) >= d30).length;
 
   const first1rm = hist[0].best1rm;
   const last1rm = hist[hist.length - 1].best1rm;
   const progressSinceFirst = best1rm > 0 && first1rm > 0 ? Math.round((last1rm - first1rm) * 10) / 10 : 0;
 
   // Best 1RM in last 30 days
-  const recent30 = hist.filter(h => new Date(h.date) >= d30);
+  const recent30 = hist.filter(h => parseDateInput(h.date) >= d30);
   const best1rm30 = recent30.length ? Math.max(...recent30.map(h => h.best1rm)) : 0;
 
   return {
@@ -400,7 +402,7 @@ function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNot
   const trendIcon = trend === "up" ? "\u2197" : trend === "down" ? "\u2198" : "\u2192";
 
   const chartData = hist.map(h => ({
-    d: new Date(h.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }),
+    d: formatDate(h.date, { day: "2-digit", month: "2-digit" }),
     e1rm: Math.round(h.best1rm * 10) / 10,
     maxW: h.maxW,
     vol: Math.round(h.vol),
@@ -487,7 +489,7 @@ function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNot
             </div>
           )}
           {best1rm30 > 0 && <div style={{ fontSize: 13, color: C.sub }}>Best 1RM (30 Tage): <span style={{ fontWeight: 700, color: C.ember }}>{Math.round(best1rm30)} kg</span></div>}
-          <div style={{ fontSize: 13, color: C.sub }}>Letztes Training: <span style={{ fontWeight: 700 }}>{new Date(lastTrained).toLocaleDateString("de-DE", { day: "2-digit", month: "short" })}</span></div>
+          <div style={{ fontSize: 13, color: C.sub }}>Letztes Training: <span style={{ fontWeight: 700 }}>{formatDate(lastTrained, { day: "2-digit", month: "short" })}</span></div>
           <div style={{ fontSize: 13, color: C.sub }}>Häufigkeit: <span style={{ fontWeight: 700 }}>{freq14}x in 14 Tagen</span> &middot; <span style={{ fontWeight: 700 }}>{freq30}x in 30 Tagen</span></div>
           {firstLogged !== lastTrained && <div style={{ fontSize: 13, color: C.dim }}>Erstes Log: {new Date(firstLogged).toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "2-digit" })}</div>}
         </div>
@@ -527,7 +529,7 @@ function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNot
                 opacity: m.reached ? 1 : 0.4,
               }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: m.reached ? C.gold : C.dim }}>{m.label}</div>
-                {m.reached && m.date && <div style={{ fontSize: 9, color: C.muted }}>{new Date(m.date).toLocaleDateString("de-DE", { month: "short", year: "2-digit" })}</div>}
+                {m.reached && m.date && <div style={{ fontSize: 9, color: C.muted }}>{formatDate(m.date, { month: "short", year: "2-digit" })}</div>}
               </div>
             ))}
           </div>
@@ -541,7 +543,7 @@ function ExerciseDetail({ exerciseId, sLog, C, onClose, exerciseNotes, onEditNot
           {hist.slice(-8).reverse().map((h, i) => (
             <div key={i} style={{ background: C.card, borderRadius: 12, padding: "10px 14px", border: `1px solid ${C.border}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{new Date(h.date).toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "2-digit" })}</span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{formatDate(h.date, { day: "2-digit", month: "short", year: "2-digit" })}</span>
                 <span style={{ fontSize: 11, color: C.muted }}>{h.totalSets} Sätze &middot; {Math.round(h.vol)}kg</span>
               </div>
               <div style={{ fontSize: 12, color: C.sub }}>
@@ -567,7 +569,7 @@ function muscleRec(muscle, log, exList=EX) {
   for (const w of log) for (const ex of (w.exercises||[])) {
     const d = exList.find(e => e.id === ex.exerciseId) || EX.find(e => e.id === ex.exerciseId);
     if (d && (d.m === muscle || d.s?.includes(muscle))) {
-      const t = new Date(w.date).getTime();
+      const t = parseDateInput(w.date).getTime();
       if (t > lastTime) {
         lastTime = t;
         const isPrimary = d.m === muscle;
@@ -586,11 +588,33 @@ function muscleRec(muscle, log, exList=EX) {
 const REST_DEFAULTS = { compound: 180, isolation: 90, default: 120 };
 const COMPOUND_IDS = ["bench_bb","bench_db","incline_bb","incline_db","decline_bb","squat_bb","squat_front","squat_smith","deadlift","rdl","ohp_bb","ohp_smith","row_bb","hip_thrust","leg_press"];
 
+function parseActiveWorkout(raw) {
+  if (!raw) return null;
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.exercises)) return null;
+  return {
+    ...parsed,
+    id: String(parsed.id || Date.now()),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(parsed.date || "") ? parsed.date : toDateInput(),
+    start: Number.isFinite(Number(parsed.start)) ? Number(parsed.start) : Date.now(),
+    exercises: parsed.exercises.filter(ex => ex && typeof ex.exerciseId === "string" && Array.isArray(ex.sets)),
+  };
+}
+
+function parseBackup(raw) {
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Ungültiges Backup-Format");
+  for (const key of ["workouts", "strengthLog", "strengthTemplates", "trainingDays", "customExercises"]) {
+    if (parsed[key] !== undefined && !Array.isArray(parsed[key])) throw new Error(`${key} hat ein ungültiges Format`);
+  }
+  return parsed;
+}
+
 export default function StrengthTab({ C, data, update, onBack }) {
   const [sub, setSub] = useState("log");
   const [detailEx, setDetailEx] = useState(null); // exercise detail view
   const [active, setActive] = useState(() => {
-    try { const s = localStorage.getItem("cardio-activeWorkout"); return s ? JSON.parse(s) : null; } catch { return null; }
+    try { return parseActiveWorkout(localStorage.getItem("cardio-activeWorkout")); } catch { return null; }
   });
   const [picker, setPicker] = useState(false);
   const [exFilter, setExFilter] = useState("all");
@@ -640,6 +664,36 @@ export default function StrengthTab({ C, data, update, onBack }) {
   const [showCustomExModal, setShowCustomExModal] = useState(false);
   const [editingNoteFor, setEditingNoteFor] = useState(null);
   const [noteText, setNoteText] = useState("");
+  const [dataNotice, setDataNotice] = useState("");
+
+  const createBackup = useCallback(() => {
+    const { aiApiKey: _secret, ...safeData } = data;
+    return JSON.stringify({ ...safeData, schemaVersion: 1, exportedAt: new Date().toISOString() }, null, 2);
+  }, [data]);
+
+  const copyBackup = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(createBackup());
+      setDataNotice("Backup kopiert. Dein API-Key wurde aus Sicherheitsgründen nicht exportiert.");
+    } catch {
+      setDataNotice("Kopieren wurde vom Browser blockiert. Nutze stattdessen den Datei-Download.");
+    }
+  }, [createBackup]);
+
+  const downloadBackup = useCallback(() => {
+    try {
+      const blob = new Blob([createBackup()], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `performance-tracker-backup-${toDateInput()}.json`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setDataNotice("Backup-Datei erstellt. Dein API-Key ist nicht enthalten.");
+    } catch {
+      setDataNotice("Die Backup-Datei konnte nicht erstellt werden.");
+    }
+  }, [createBackup]);
 
   // Merge built-in + custom exercises
   const ALL_EX = useMemo(() => [...EX, ...customExercises], [customExercises]);
@@ -725,7 +779,7 @@ export default function StrengthTab({ C, data, update, onBack }) {
       if (!ALL_EX.some(x => x.id === eid)) return null;
       return { exerciseId: eid, sets: mkSets(eid) };
     }).filter(Boolean) : [];
-    setActive({ id: Date.now().toString(), date: new Date().toISOString().slice(0,10), start: Date.now(), exercises });
+    setActive({ id: Date.now().toString(), date: toDateInput(), start: Date.now(), exercises });
     setShowTmpl(false); setShowSplits(false);
   };
 
@@ -1023,7 +1077,7 @@ Antworte NUR mit JSON:
     try {
       // Aggregate volume per muscle over last 4 weeks
       const fourWeeksAgo = new Date(); fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
-      const recentLogs = sLog.filter(w => w.date >= fourWeeksAgo.toISOString().slice(0, 10));
+      const recentLogs = sLog.filter(w => w.date >= toDateInput(fourWeeksAgo));
 
       const muscleVol = {};
       const muscleSets = {};
@@ -1362,7 +1416,7 @@ REGELN FÜR DEINE ANTWORTEN:
   const removeExFromDay = (dayId, exIdx) => save(undefined, undefined, trainingDays.map(d => d.id===dayId?{...d,exercises:d.exercises.filter((_,i)=>i!==exIdx)}:d));
 
   const weekVol = useMemo(() => {
-    const cut = new Date(); cut.setDate(cut.getDate()-7); const cd = cut.toISOString().slice(0,10);
+    const cut = new Date(); cut.setDate(cut.getDate()-7); const cd = toDateInput(cut);
     const vol = {}; MG.forEach(m => { vol[m.id] = 0; });
     sLog.filter(w => w.date >= cd).forEach(w => (w.exercises||[]).forEach(ex => {
       const d = ALL_EX.find(e => e.id === ex.exerciseId); if (!d) return;
@@ -1380,13 +1434,7 @@ REGELN FÜR DEINE ANTWORTEN:
     if (sLog.length < 8) return null; // need enough data
 
     // Group workouts by week (ISO week start = Monday)
-    const getWeekKey = (dateStr) => {
-      const d = new Date(dateStr);
-      const day = d.getDay(); // 0=Sun
-      const mon = new Date(d);
-      mon.setDate(d.getDate() - ((day + 6) % 7)); // shift to Monday
-      return mon.toISOString().slice(0, 10);
-    };
+    const getWeekKey = getISOWeekKey;
 
     const weekMap = {};
     sLog.forEach(w => {
@@ -1470,17 +1518,13 @@ REGELN FÜR DEINE ANTWORTEN:
   const gamification = useMemo(() => {
     if (!sLog.length) return { weekStreak: 0, totalWorkouts: 0, xp: 0, level: 1, levelName: "Anfänger", nextLevelXp: 100, badges: [] };
 
-    const getWeekKey = (dateStr) => {
-      const d = new Date(dateStr);
-      const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-      return mon.toISOString().slice(0, 10);
-    };
+    const getWeekKey = getISOWeekKey;
     const weekSet = new Set(sLog.map(w => getWeekKey(w.date)));
     let weekStreak = 0;
     const now = new Date();
     for (let i = 0; i < 52; i++) {
       const d = new Date(now); d.setDate(now.getDate() - i * 7);
-      if (weekSet.has(getWeekKey(d.toISOString().slice(0, 10)))) weekStreak++;
+      if (weekSet.has(getWeekKey(toDateInput(d)))) weekStreak++;
       else break;
     }
 
@@ -1529,10 +1573,10 @@ REGELN FÜR DEINE ANTWORTEN:
 
     const lastDate = sLog[0]?.date;
     if (!lastDate) return null;
-    const daysSinceLast = Math.floor((Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24));
+    const daysSinceLast = Math.floor((Date.now() - parseDateInput(lastDate).getTime()) / (1000 * 60 * 60 * 24));
 
     const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + (weekStart.getDay() === 0 ? -6 : 1));
-    const thisWeekSessions = sLog.filter(w => w.date >= weekStart.toISOString().slice(0, 10)).length;
+    const thisWeekSessions = sLog.filter(w => w.date >= toDateInput(weekStart)).length;
 
     if (daysSinceLast === 0 && thisWeekSessions >= 5) {
       return { type: "rest", message: "Ruhetag empfohlen — 5+ Sessions diese Woche.", detail: "Regeneration ist genauso wichtig wie Training." };
@@ -1568,14 +1612,14 @@ REGELN FÜR DEINE ANTWORTEN:
   return (
     <div style={{background:"transparent",minHeight:"100vh",color:C.text,fontFamily:"'Manrope',sans-serif"}}>
       <div style={{position:"sticky",top:0,zIndex:50,borderBottom:`1px solid ${C.border}`,background:"rgba(10,10,15,0.8)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)"}}>
-        <div style={{padding:"20px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div className="app-shell-header" style={{padding:"20px 24px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
             {onBack && <button onClick={onBack} style={{fontSize:11,color:C.ember,background:"none",border:"none",cursor:"pointer",fontFamily:"'Manrope',sans-serif",fontWeight:600,padding:0,marginBottom:4,letterSpacing:3,textTransform:"uppercase"}}>&larr; ZURÜCK</button>}
             <div style={{fontSize:32,fontWeight:300,letterSpacing:8,fontFamily:"'Cormorant Garamond',serif",textTransform:"uppercase",lineHeight:1}}>KRAFT</div>
           </div>
           <div style={{display:"flex",gap:6,marginTop:4}}>
-            <button onClick={()=>setShowDataPanel(true)} style={{padding:"8px 12px",borderRadius:24,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,color:C.muted,fontSize:10,fontWeight:500,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2,textTransform:"uppercase",backdropFilter:"blur(10px)"}}>Daten</button>
-            <button onClick={()=>setShowEqSettings(true)} style={{padding:"8px 12px",borderRadius:24,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,color:C.muted,fontSize:10,fontWeight:500,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:2,textTransform:"uppercase",backdropFilter:"blur(10px)"}}>Equipment</button>
+            <button aria-label="Daten und Backups" onClick={()=>setShowDataPanel(true)} style={{padding:"8px 12px",borderRadius:24,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,color:C.muted,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:1.4,textTransform:"uppercase",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",gap:6}}><Database size={13}/> Daten</button>
+            <button aria-label="Equipment auswählen" onClick={()=>setShowEqSettings(true)} style={{padding:"8px 12px",borderRadius:24,background:"rgba(255,255,255,0.04)",border:`1px solid ${C.border}`,color:C.muted,fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"'Manrope',sans-serif",letterSpacing:1.4,textTransform:"uppercase",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",gap:6}}><SlidersHorizontal size={13}/> Equipment</button>
           </div>
         </div>
       </div>
@@ -1618,24 +1662,21 @@ REGELN FÜR DEINE ANTWORTEN:
           <div style={{background:C.elevated,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:480,padding:"16px 22px 36px",animation:"slideUp 0.25s ease-out",maxHeight:"80vh",overflowY:"auto"}}>
             <div style={{width:40,height:5,borderRadius:3,background:C.borderLight,margin:"0 auto 16px"}}/>
             <div style={{fontSize:18,fontWeight:700,marginBottom:6}}>Daten Export / Import</div>
-            <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.5}}>Übertrage deine Daten zwischen Browsern oder Geräten.</div>
+            <div style={{fontSize:12,color:C.muted,marginBottom:16,lineHeight:1.5}}>Übertrage deine Trainingsdaten zwischen Browsern oder Geräten. API-Keys bleiben immer auf diesem Gerät.</div>
 
             {/* Export */}
             <div style={{marginBottom:20}}>
               <div style={{fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.sub,marginBottom:8}}>Export</div>
-              <div style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Kopiert alle Daten (Workouts, Templates, Splits, Equipment, Notizen) in die Zwischenablage.</div>
-              <button onClick={()=>{
-                try {
-                  const raw = localStorage.getItem("cardio-v4");
-                  if (!raw) { alert("Keine Daten gefunden."); return; }
-                  navigator.clipboard.writeText(raw).then(()=>alert("Daten kopiert! Füge sie im anderen Browser ein.")).catch(()=>{
-                    // Fallback: show in prompt
-                    prompt("Kopiere diesen Text:", raw);
-                  });
-                } catch(e) { alert("Fehler: " + e.message); }
-              }} style={{width:"100%",padding:"14px 0",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",letterSpacing:2,textTransform:"uppercase"}}>
-                Daten in Zwischenablage kopieren
-              </button>
+              <div style={{fontSize:11,color:C.muted,marginBottom:10,lineHeight:1.4}}>Exportiert Workouts, Vorlagen, Splits, Equipment und Notizen. Dein AI API-Key wird bewusst ausgeschlossen.</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={downloadBackup} style={{padding:"13px 10px",background:`linear-gradient(135deg, ${C.ember}, #a87a52)`,color:"#0a0a0f",border:"none",borderRadius:14,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+                  <Download size={15}/> Datei speichern
+                </button>
+                <button onClick={copyBackup} style={{padding:"13px 10px",background:C.card,color:C.sky,border:`1px solid ${C.sky}30`,borderRadius:14,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+                  <Database size={15}/> JSON kopieren
+                </button>
+              </div>
+              {dataNotice && <div role="status" style={{fontSize:11,color:C.lime,marginTop:9,lineHeight:1.4}}>{dataNotice}</div>}
             </div>
 
             {/* Import */}
@@ -1651,7 +1692,7 @@ REGELN FÜR DEINE ANTWORTEN:
                   try {
                     const raw = document.getElementById("data-import-field").value.trim();
                     if (!raw) { alert("Kein Text eingefügt."); return; }
-                    const imported = JSON.parse(raw);
+                    const imported = parseBackup(raw);
                     if (!confirm("Daten ZUSAMMENFÜHREN? Workouts werden kombiniert, neuere Einstellungen überschreiben ältere.")) return;
                     // Merge: combine logs, keep latest templates/days/equipment/notes
                     const current = JSON.parse(localStorage.getItem("cardio-v4") || "{}");
@@ -1667,7 +1708,7 @@ REGELN FÜR DEINE ANTWORTEN:
                       trainingDays: current.trainingDays?.length ? current.trainingDays : (imported.trainingDays || []),
                       userEquipment: current.userEquipment || imported.userEquipment,
                       exerciseNotes: { ...(imported.exerciseNotes||{}), ...(current.exerciseNotes||{}) },
-                      aiApiKey: current.aiApiKey || imported.aiApiKey || "",
+                      aiApiKey: current.aiApiKey || "",
                     };
                     localStorage.setItem("cardio-v4", JSON.stringify(merged));
                     localStorage.removeItem("cardio-activeWorkout");
@@ -1681,9 +1722,11 @@ REGELN FÜR DEINE ANTWORTEN:
                   try {
                     const raw = document.getElementById("data-import-field").value.trim();
                     if (!raw) { alert("Kein Text eingefügt."); return; }
-                    const imported = JSON.parse(raw);
+                    const imported = parseBackup(raw);
                     if (!confirm("ACHTUNG: Alle aktuellen Daten werden ÜBERSCHRIEBEN. Fortfahren?")) return;
-                    localStorage.setItem("cardio-v4", JSON.stringify(imported));
+                    const current = JSON.parse(localStorage.getItem("cardio-v4") || "{}");
+                    const safeImported = { ...imported, aiApiKey: current.aiApiKey || "" };
+                    localStorage.setItem("cardio-v4", JSON.stringify(safeImported));
                     localStorage.removeItem("cardio-activeWorkout");
                     alert("Daten ersetzt! App wird neu geladen.");
                     window.location.reload();
@@ -1951,18 +1994,18 @@ REGELN FÜR DEINE ANTWORTEN:
         </div>
       )}
 
-    <div style={{padding:"22px 20px 100px",animation:"fadeIn 0.35s ease"}}>
+    <main className="strength-shell-content" style={{padding:"22px 20px 100px",animation:"fadeIn 0.35s ease"}}>
 
       {/* ═══ FIXED BOTTOM NAV ═══ */}
       <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:60,background:"rgba(10,10,15,0.92)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderTop:`1px solid ${C.border}`,paddingBottom:"env(safe-area-inset-bottom, 0px)"}}>
-        <div style={{display:"flex",maxWidth:480,margin:"0 auto"}}>
+        <div style={{display:"flex",maxWidth:620,margin:"0 auto"}}>
           {[
-            ["log","Workout","◎"],
-            ["days","Tage","▤"],
-            ["history","Verlauf","◔"],
-            ["muscles","Muskeln","⬡"],
-            ["coach","Coach","✦"],
-          ].map(([k,l,icon])=>{
+            ["log","Workout",Dumbbell],
+            ["days","Tage",CalendarDays],
+            ["history","Verlauf",History],
+            ["muscles","Muskeln",Scan],
+            ["coach","Coach",Sparkles],
+          ].map(([k,l,Icon])=>{
             const active2 = sub===k;
             return (
               <button key={k} onClick={()=>setSub(k)} style={{
@@ -1972,7 +2015,7 @@ REGELN FÜR DEINE ANTWORTEN:
                 transition:"all 0.2s",position:"relative",
               }}>
                 {active2 && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:20,height:2,background:C.ember,borderRadius:1}} />}
-                <span style={{fontSize:18,lineHeight:1,filter:active2?`drop-shadow(0 0 6px ${C.ember}66)`:"none",transition:"filter 0.2s"}}>{icon}</span>
+                <Icon size={18} strokeWidth={active2?2.3:1.7} style={{filter:active2?`drop-shadow(0 0 6px ${C.ember}66)`:"none",transition:"filter 0.2s"}}/>
                 <span style={{fontSize:9,fontWeight:active2?700:500,letterSpacing:1.5,textTransform:"uppercase"}}>{l}</span>
               </button>
             );
@@ -2362,7 +2405,7 @@ REGELN FÜR DEINE ANTWORTEN:
                   </div>
                 )}
                 {sug && <div style={{background:C.goldBg,borderRadius:10,padding:"8px 12px",marginBottom:8,border:`1px solid ${C.gold}20`,fontSize:12,color:C.gold,fontWeight:600}}>{sug.reason}</div>}
-                {prev && <div style={{fontSize:11,color:C.dim,marginBottom:6}}>Letztes Mal ({new Date(prev.date).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})}): {prev.sets.map(s=>`${s.weight}x${s.reps}${s.type&&s.type!=="N"?` (${s.type})`:""}${s.rpe?` @${s.rpe}`:""}`).join(" / ")}</div>}
+                {prev && <div style={{fontSize:11,color:C.dim,marginBottom:6}}>Letztes Mal ({formatDate(prev.date,{day:"2-digit",month:"2-digit"})}): {prev.sets.map(s=>`${s.weight}x${s.reps}${s.type&&s.type!=="N"?` (${s.type})`:""}${s.rpe?` @${s.rpe}`:""}`).join(" / ")}</div>}
 
                 {/* ═══ NOTES AREA ═══ */}
                 {(()=>{
@@ -2558,7 +2601,7 @@ REGELN FÜR DEINE ANTWORTEN:
                     for (let d = 0; d < 7; d++) {
                       const date = new Date(startMon);
                       date.setDate(startMon.getDate() + w * 7 + d);
-                      const ds = date.toISOString().slice(0, 10);
+                      const ds = toDateInput(date);
                       const isFuture = date > today;
                       const info = dayMap[ds];
                       week.push({ date: ds, day: date, info, isFuture });
@@ -2602,7 +2645,7 @@ REGELN FÜR DEINE ANTWORTEN:
                                 {week[0].day.getDate() <= 7 ? new Date(week[0].date).toLocaleDateString("de-DE", {month:"short"}) : ""}
                               </div>
                               {week.map((cell, di) => {
-                                const isToday = cell.date === new Date().toISOString().slice(0,10);
+                                const isToday = cell.date === toDateInput();
                                 return (
                                   <div key={di} title={cell.info ? `${cell.date}: ${cell.info.exercises} Üb., ${Math.round(cell.info.vol)}kg` : cell.date} style={{
                                     width:SZ,height:SZ,borderRadius:2.5,
@@ -2703,7 +2746,7 @@ REGELN FÜR DEINE ANTWORTEN:
                               <div style={{width:4,height:28,borderRadius:2,background:group.color,flexShrink:0}} />
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pr.name}</div>
-                                <div style={{fontSize:10,color:C.dim}}>{new Date(pr.date).toLocaleDateString("de-DE",{day:"2-digit",month:"short",year:"2-digit"})}</div>
+                                <div style={{fontSize:10,color:C.dim}}>{formatDate(pr.date,{day:"2-digit",month:"short",year:"2-digit"})}</div>
                               </div>
                               <div style={{textAlign:"right",flexShrink:0}}>
                                 <div style={{fontSize:15,fontWeight:800,color:group.color,fontVariantNumeric:"tabular-nums"}}>{Math.round(pr.e1rm)}<span style={{fontSize:10,fontWeight:400,color:C.dim}}> 1RM</span></div>
@@ -2750,7 +2793,7 @@ REGELN FÜR DEINE ANTWORTEN:
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {sLog.slice(0, 15).map((w,i)=>(<div key={w.id||i} style={{background:C.surface,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.border}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                    <div style={{fontSize:15,fontWeight:700}}>{new Date(w.date).toLocaleDateString("de-DE",{day:"2-digit",month:"short",year:"2-digit"})}</div>
+                    <div style={{fontSize:15,fontWeight:700}}>{formatDate(w.date,{day:"2-digit",month:"short",year:"2-digit"})}</div>
                     <div style={{fontSize:12,color:C.muted}}>{w.duration||"?"} min &middot; {(w.exercises||[]).length} Üb.</div>
                   </div>
                   {(w.exercises||[]).map((ex,ei)=>{
@@ -2980,7 +3023,7 @@ REGELN FÜR DEINE ANTWORTEN:
           </div>
         </div>
       )}
-    </div>
+    </main>
     </div>
   );
 }
